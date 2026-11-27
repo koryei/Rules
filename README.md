@@ -71,6 +71,19 @@ It never replaces your git setup. If git already has a global hooks path, or
 `~/.git-hooks` holds hooks or a dispatcher of yours, the installer leaves them
 alone and tells you which hooks are inactive. `rules hooks` shows the same.
 
+## Cursor
+
+Cursor is not linked. Its global rules are stored in the app's settings, so the
+installer has no file to point at yours. Two ways to use your rules there:
+
+- Paste them into **Customize → Rules** as a User Rule, and paste again after
+  you change them.
+- Put an `AGENTS.md` in a project's root. Cursor reads it for that project.
+
+The git hooks still run on commits Cursor makes. See Cursor's
+[rules documentation](https://cursor.com/docs/rules).
+
+
 ## Use
 
 ```sh
