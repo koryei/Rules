@@ -2,9 +2,9 @@
 
 One file of rules for every AI coding tool.
 
-You write your engineering rules once. Claude Code, Codex, Cursor, Gemini,
-Windsurf, opencode, crush, goose, and Continue all read the same file. Change it
-once and every tool follows.
+You write your engineering rules once. Claude Code, Codex, Gemini CLI,
+Windsurf, opencode, crush, goose, Continue, and Mistral Vibe all read the same
+file. Change it once and every tool follows.
 
 Agents can propose changes. Only you can apply them.
 
