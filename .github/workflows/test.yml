@@ -1,0 +1,32 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+
+      # The hook suite commits in a throwaway repo and expects the hooks to
+      # fire, so they have to be installed on the runner first. The dispatcher
+      # resolves each hook from ~/.config/git-policy/hooks, so the checkout is
+      # installed from that path, the same way the README tells people to.
+      - name: Install the hooks
+        run: |
+          mkdir -p "$HOME/.config/git-policy"
+          cp -R bin hooks install.sh "$HOME/.config/git-policy/"
+          "$HOME/.config/git-policy/install.sh"
+
+      - name: Hook tests
+        run: ./test/run.sh
+
+      - name: Installer tests
+        run: ./test/install.sh
