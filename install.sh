@@ -43,24 +43,59 @@ printf '\n'
 "$HERE/bin/sync-agent-rules.sh"
 
 # 4. git hooks
+# Anything of yours stays: a hooks path, a hook file or a customised
+# dispatcher is never replaced.
 printf '\n'
 HOOKS_DIR="$HOME/.git-hooks"
 mkdir -p "$HOOKS_DIR"
-if [ -f "$HOOKS_DIR/_dispatch" ] && ! grep -q 'git-policy/hooks' "$HOOKS_DIR/_dispatch"; then
+current=$(git config --global --path --get core.hooksPath 2>/dev/null)
+usable=1
+kept=""
+
+if [ ! -e "$HOOKS_DIR/_dispatch" ] && [ ! -L "$HOOKS_DIR/_dispatch" ]; then
+  cp "$HERE/hooks/_dispatch" "$HOOKS_DIR/_dispatch"
+  chmod +x "$HOOKS_DIR/_dispatch"
+  ok "installed the hook dispatcher"
+elif grep -q 'git-policy/hooks' "$HOOKS_DIR/_dispatch" 2>/dev/null; then
+  ok "kept the dispatcher at $HOOKS_DIR/_dispatch"
+else
+  usable=0
   warn "existing dispatcher at $HOOKS_DIR/_dispatch does not call the policy hooks"
   say "  add this before its local-hook handoff:"
   say '    policy="$HOME/.config/git-policy/hooks/$name"'
   say '    [ -x "$policy" ] && { "$policy" "$@" || exit $?; }'
-else
-  cp "$HERE/hooks/_dispatch" "$HOOKS_DIR/_dispatch"
-  chmod +x "$HOOKS_DIR/_dispatch"
+fi
+
+if [ "$usable" = "1" ]; then
   for h in applypatch-msg commit-msg post-applypatch post-checkout post-commit \
            post-merge post-rewrite pre-applypatch pre-auto-gc pre-commit \
            pre-merge-commit pre-push pre-rebase prepare-commit-msg; do
-    ln -sf _dispatch "$HOOKS_DIR/$h"
+    target="$HOOKS_DIR/$h"
+    if [ -L "$target" ] && [ "$(readlink "$target")" = "_dispatch" ]; then
+      continue
+    elif [ -e "$target" ] || [ -L "$target" ]; then
+      kept="$kept $h"
+    else
+      ln -s _dispatch "$target"
+    fi
   done
+  [ -n "$kept" ] && warn "kept your own hooks in $HOOKS_DIR:$kept"
+fi
+
+if [ -n "$current" ] && [ ! "$current" -ef "$HOOKS_DIR" ]; then
+  warn "left your git hooks alone: git already runs them from $current"
+  say "  the Agent Rules hooks are not active. call them from your hooks, or"
+  say "  switch git over yourself:"
+  say "    git config --global core.hooksPath $HOOKS_DIR"
+elif [ "$usable" = "1" ] && [ -z "$current" ] && [ -n "$kept" ]; then
+  warn "left your git hooks alone: turning on $HOOKS_DIR would start running yours"
+  say "  the Agent Rules hooks are not active. to turn them all on:"
+  say "    git config --global core.hooksPath $HOOKS_DIR"
+elif [ "$usable" = "1" ] && [ -z "$current" ]; then
   git config --global core.hooksPath "$HOOKS_DIR"
-  ok "installed dispatcher and set core.hooksPath"
+  ok "set core.hooksPath to $HOOKS_DIR"
+elif [ "$usable" = "1" ]; then
+  ok "core.hooksPath already points to $HOOKS_DIR"
 fi
 
 printf '\n  done. run: rules\n\n'
