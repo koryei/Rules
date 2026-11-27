@@ -44,7 +44,8 @@ printf '\n'
 
 # 4. git hooks
 # Anything of yours stays: a hooks path, a hook file or a customised
-# dispatcher is never replaced.
+# dispatcher is never replaced. A dispatcher from before _policy is the one
+# exception: it cannot be repointed, so it is replaced and the installer says so.
 printf '\n'
 HOOKS_DIR="$HOME/.git-hooks"
 mkdir -p "$HOOKS_DIR"
