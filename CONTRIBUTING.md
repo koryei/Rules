@@ -16,6 +16,7 @@ free, and it should stay that way.
 
 ```sh
 ./test/run.sh
+./test/install.sh
 ```
 
 All tests must pass. If you add a hook behaviour, add a test for it.

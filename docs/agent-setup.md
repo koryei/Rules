@@ -31,7 +31,9 @@ Do not edit ~/AGENTS.md directly. If you want to change the rules, run
    - links `rules` onto your `PATH` at `~/.local/bin/rules`
    - creates `~/AGENTS.md` if it does not exist
    - symlinks that file into every agent config it finds
-   - installs the git hook dispatcher and sets `core.hooksPath`
+   - installs the git hook dispatcher and sets `core.hooksPath`, unless you
+     already have a hooks path or hooks of your own, which it leaves alone and
+     reports
 4. Print the dashboard.
 
 Nothing is pushed anywhere. Nothing leaves your machine.
@@ -74,9 +76,10 @@ You want:
    rules file   ✓ ~/AGENTS.md
    approval     ✓ matches last human approval
    tools        ✓ 9/9 linked
-   hooks        ✓ 3/3 executable
+   hooks        ✓ 3/3 active
 
   ✓ All checks passed.
 ```
 
-If `tools` is short, run `rules sync`. If `hooks` is short, re-run the installer.
+If `tools` is short, run `rules sync`. If `hooks` is short, `rules hooks` shows
+which ones git is not running.

@@ -58,6 +58,11 @@ Because this lives in git config rather than in any agent, it fires no matter
 which tool ran `git commit`. Claude, Codex, Cursor, a human in a terminal — all
 the same.
 
+The installer only sets this up where nothing is in the way. An existing global
+hooks path, a hook file of yours or your own dispatcher is never replaced. To
+use both, add the policy call above to your own hooks. `rules check` counts a
+hook as active only when git will run it.
+
 The dispatcher is also where machine-local behaviour goes. If you already have a
 hook that pings a counter or sends a notification, put it above the policy call.
 
