@@ -154,7 +154,7 @@ async function copyPrompt(button) {
 
   if (!ok) {
     $('#tab-prompt').click();
-    say(button, 'Couldn’t reach the clipboard. The prompt is selected, so press ⌘C or Ctrl+C');
+    say(button, 'Couldn’t copy automatically. The prompt is selected, so press ⌘C (Ctrl+C on Linux)');
     source.focus({ preventScroll: true });
     getSelection().selectAllChildren(source);
     return;
