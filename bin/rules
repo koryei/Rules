@@ -1,0 +1,922 @@
+#!/usr/bin/env bash
+# rules — one file of rules, every AI tool, human approval to change it.
+#
+#   rules              dashboard
+#   rules edit         edit the rules in-terminal        (human only)
+#   rules propose      request a change, never applies it (agents use this)
+#   rules review       accept or reject proposals         (human only)
+#   rules show         print the rules
+#   rules check        link health + unapproved-edit detection
+#   rules sync         re-link into every agent config
+#   rules project      which rules file wins in this directory
+#   rules hooks        hook status
+#   rules test         run the hook test suite
+#   rules log          audit trail
+#
+# Editing the global rules ALWAYS requires a human. Agents must use
+# `rules propose` and wait for a human to run `rules review`.
+set -uo pipefail
+
+VERSION="0.1.0"
+
+# Resolve our own location so the repo can live anywhere, not just
+# ~/.config/git-policy. Follows symlinks without needing readlink -f.
+resolve_self() {
+  local p="$0" d
+  while [ -L "$p" ]; do
+    d=$(cd "$(dirname "$p")" && pwd)
+    p=$(readlink "$p")
+    case "$p" in /*) ;; *) p="$d/$p" ;; esac
+  done
+  cd "$(dirname "$p")" && pwd
+}
+SELF_DIR=$(resolve_self)
+RULES_HOME="${RULES_HOME:-$(dirname "$SELF_DIR")}"
+CANON="${RULES_FILE:-$HOME/AGENTS.md}"
+LINK_TARGETS="$HOME/.codex/AGENTS.md
+$HOME/.vibe/AGENTS.md
+$HOME/.gemini/GEMINI.md
+$HOME/.config/opencode/AGENTS.md
+$HOME/.config/crush/CRUSH.md
+$HOME/.config/goose/.goosehints
+$HOME/.continue/rules/global.md
+$HOME/.codeium/windsurf/memories/global_rules.md"
+STATE="$RULES_HOME/state"
+PROPOSALS="$RULES_HOME/proposals"
+APPROVED="$STATE/approved.sha256"
+AUDIT="$STATE/audit.log"
+BLOCKS="$STATE/blocks.log"
+HOOKDIR="$RULES_HOME/hooks"
+
+# ---------------------------------------------------------------- ui --------
+ui_init() {
+  if [ -t 1 ] && [ -z "${NO_COLOR:-}" ] && [ "${TERM:-dumb}" != "dumb" ]; then
+    C_RST=$'\033[0m'; C_B=$'\033[1m'; C_D=$'\033[2m'
+    C_R=$'\033[31m'; C_G=$'\033[32m'; C_Y=$'\033[33m'
+    C_BL=$'\033[34m'; C_M=$'\033[35m'; C_C=$'\033[36m'
+  else
+    C_RST=""; C_B=""; C_D=""; C_R=""; C_G=""; C_Y=""; C_BL=""; C_M=""; C_C=""
+  fi
+  if [ -t 0 ] && [ -t 1 ]; then INTERACTIVE=1; else INTERACTIVE=0; fi
+  W=$(tput cols 2>/dev/null || echo 80)
+  [ "$W" -gt 96 ] 2>/dev/null && W=96
+  [ "$W" -lt 48 ] 2>/dev/null && W=48
+}
+
+rep() { local s=$1 n=$2 o=""; while [ "$n" -gt 0 ]; do o="$o$s"; n=$((n-1)); done; printf '%s' "$o"; }
+hr()  { printf '  %s%s%s\n' "$C_D" "$(rep '─' $((W-4)))" "$C_RST"; }
+row() { printf '  %s%-11s%s%s%s%s\n' "$C_D" "$1" "$C_RST" "${3:-}" "$2" "$C_RST"; }
+ok()  { printf '  %s✓%s %s\n' "$C_G" "$C_RST" "$1"; }
+bad() { printf '  %s✗%s %s\n' "$C_R" "$C_RST" "$1"; }
+warn(){ printf '  %s!%s %s\n' "$C_Y" "$C_RST" "$1"; }
+dim() { printf '  %s%s%s\n' "$C_D" "$1" "$C_RST"; }
+
+banner() {
+  printf '\n  %s%srules%s %s·%s %s%s\n' "$C_B" "$C_C" "$C_RST" "$C_D" "$C_RST" "$1" "$C_RST"
+  hr
+}
+
+# Reads one keypress. Prints up/down/left/right/esc, or the character itself.
+read_key() {
+  local k k2
+  IFS= read -rsn1 k 2>/dev/null || { printf ''; return; }
+  if [ "$k" = $'\033' ]; then
+    k2=""
+    IFS= read -rsn2 -t 1 k2 2>/dev/null
+    case "$k2" in
+      '[A') printf 'up' ;;
+      '[B') printf 'down' ;;
+      '[C') printf 'right' ;;
+      '[D') printf 'left' ;;
+      *)    printf 'esc' ;;
+    esac
+    return
+  fi
+  printf '%s' "$k"
+}
+
+# Single-key menu. Args: prompt, then "key|label" pairs. Prints the key.
+menu() {
+  local prompt=$1; shift
+  local item key label
+  printf '\n' >&2
+  for item in "$@"; do
+    key=${item%%|*}
+    label=${item#*|}
+    printf '    %s%s%s   %s\n' "$C_C" "$key" "$C_RST" "$label" >&2
+  done
+  printf '\n  %s%s%s ' "$C_D" "$prompt" "$C_RST" >&2
+  if [ "$INTERACTIVE" = "1" ]; then
+    read_key
+  else
+    read -r key
+    printf '%s' "$key"
+  fi
+}
+
+# Arrow-key list picker. Args: title, items... Prints 1-based index, 0 = cancel.
+pick() {
+  local title=$1; shift
+  local items=("$@")
+  local n=${#items[@]}
+  local sel=0 i key
+
+  if [ "$n" -eq 0 ]; then printf '0'; return; fi
+
+  if [ "$INTERACTIVE" != "1" ]; then
+    printf '\n  %s\n\n' "$title" >&2
+    for ((i=0;i<n;i++)); do printf '  %2d  %s\n' $((i+1)) "${items[$i]}" >&2; done
+    printf '\n  number (0 to cancel): ' >&2
+    read -r key
+    case "$key" in ''|*[!0-9]*) printf '0' ;; *) printf '%s' "$key" ;; esac
+    return
+  fi
+
+  printf '\n  %s%s%s\n\n' "$C_B" "$title" "$C_RST" >&2
+  printf '  %s↑↓ move · enter select · q back%s\n\n' "$C_D" "$C_RST" >&2
+  for ((i=0;i<n;i++)); do
+    if [ "$i" -eq "$sel" ]; then printf '  %s▸ %s%s\n' "$C_C" "${items[$i]}" "$C_RST" >&2
+    else printf '    %s\n' "${items[$i]}" >&2; fi
+  done
+
+  while :; do
+    key=$(read_key)
+    case "$key" in
+      up)   [ "$sel" -gt 0 ] && sel=$((sel-1)) ;;
+      down) [ "$sel" -lt $((n-1)) ] && sel=$((sel+1)) ;;
+      q|Q|esc) printf '\033[%dA\033[J' "$n" >&2; printf '0'; return ;;
+      '')   printf '\033[%dA\033[J' "$n" >&2; printf '%s' $((sel+1)); return ;;
+      [1-9])
+        if [ "$key" -le "$n" ]; then printf '\033[%dA\033[J' "$n" >&2; printf '%s' "$key"; return; fi ;;
+    esac
+    printf '\033[%dA' "$n" >&2
+    for ((i=0;i<n;i++)); do
+      if [ "$i" -eq "$sel" ]; then printf '\033[2K  %s▸ %s%s\n' "$C_C" "${items[$i]}" "$C_RST" >&2
+      else printf '\033[2K    %s\n' "${items[$i]}" >&2; fi
+    done
+  done
+}
+
+# Colours a unified diff on stdin.
+colorize_diff() {
+  local l
+  while IFS= read -r l; do
+    case "$l" in
+      +*)  printf '  %s%s%s\n' "$C_G" "$l" "$C_RST" ;;
+      -*)  printf '  %s%s%s\n' "$C_R" "$l" "$C_RST" ;;
+      @@*) printf '  %s%s%s\n' "$C_C" "$l" "$C_RST" ;;
+      *)   printf '  %s\n' "$l" ;;
+    esac
+  done
+}
+
+# Strips leading and trailing blank lines so diffs stay readable.
+trim_blanks() {
+  awk '{ l[NR]=$0 } END {
+    first=1; while (first<=NR && l[first]=="") first++
+    last=NR; while (last>=first && l[last]=="") last--
+    for (i=first;i<=last;i++) print l[i]
+  }' "$1"
+}
+
+# One-line verdict about the current state.
+verdict() {
+  if [ ! -f "$CANON" ]; then
+    printf '%sNo rules file yet.%s' "$C_Y" "$C_RST"; return
+  fi
+  local cur appr np bad
+  cur=$(hash_of "$CANON"); appr=$(cat "$APPROVED" 2>/dev/null || echo "")
+  np=0; [ -d "$PROPOSALS" ] && np=$(ls -1 "$PROPOSALS"/*.proposal 2>/dev/null | wc -l | tr -d ' ')
+  bad=$(link_problems)
+
+  if [ -n "$appr" ] && [ "$cur" != "$appr" ]; then
+    printf '%sYour rules were changed outside the CLI.%s' "$C_R" "$C_RST"
+  elif [ "$np" -gt 0 ]; then
+    if [ "$np" -eq 1 ]; then printf '%s1 proposal waiting for your review.%s' "$C_M" "$C_RST"
+    else printf '%s%d proposals waiting for your review.%s' "$C_M" "$np" "$C_RST"; fi
+  elif [ "$bad" -gt 0 ]; then
+    if [ "$bad" -eq 1 ]; then printf '%s1 tool link needs attention.%s' "$C_Y" "$C_RST"
+    else printf '%s%d tool links need attention.%s' "$C_Y" "$bad" "$C_RST"; fi
+  else
+    printf '%s✓ Everything is in order.%s' "$C_G" "$C_RST"
+  fi
+}
+
+hook_summary() {
+  local n=0 h
+  for h in pre-commit commit-msg pre-push; do [ -x "$HOOKDIR/$h" ] && n=$((n+1)); done
+  if [ "$n" -eq 3 ]; then printf '%s3 active%s' "$C_G" "$C_RST"
+  else printf '%s%d/3 active%s' "$C_Y" "$n" "$C_RST"; fi
+}
+
+
+# ------------------------------------------------------------- helpers ------
+mtime() { stat -f %m "$1" 2>/dev/null || stat -c %Y "$1" 2>/dev/null || echo 0; }
+ago() {
+  local d=$(( $(date +%s) - $1 ))
+  if   [ "$d" -lt 60 ];    then echo "just now"
+  elif [ "$d" -lt 3600 ];  then echo "$((d/60))m ago"
+  elif [ "$d" -lt 86400 ]; then echo "$((d/3600))h ago"
+  else echo "$((d/86400))d ago"; fi
+}
+hash_of() { shasum -a 256 "$1" 2>/dev/null | awk '{print $1}'; }
+human_size() { local b=$1; if [ "$b" -lt 1024 ]; then echo "${b}B"; elif [ "$b" -lt 1048576 ]; then echo "$((b/1024))KB"; else echo "$((b/1048576))MB"; fi; }
+
+audit() {
+  mkdir -p "$STATE"
+  printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${RULES_ACTOR:-human}" "$1" >> "$AUDIT"
+}
+
+ensure_dirs() { mkdir -p "$STATE" "$PROPOSALS"; }
+
+# --------------------------------------------------- human approval gate ----
+# Returns 0 and prints the reason if this looks like an AI agent.
+agent_detected() {
+  [ "${RULES_AGENT:-0}" = "1" ] && { echo "RULES_AGENT=1"; return 0; }
+  for v in CLAUDECODE CLAUDE_CODE_ENTRYPOINT CURSOR_AGENT CODEX_SANDBOX \
+           CODEX_SESSION_ID VIBE_SESSION AIDER_MODEL GEMINI_CLI \
+           COPILOT_AGENT OPENCODE_AGENT WINDSURF_AGENT AMP_AGENT \
+           CONTINUE_AGENT DEVIN_AGENT; do
+    eval "val=\${$v:-}"
+    [ -n "$val" ] && { echo "$v"; return 0; }
+  done
+  [ ! -t 0 ] && { echo "non-interactive stdin"; return 0; }
+  return 1
+}
+
+link_total() { printf '9'; }
+
+link_problems() {
+  local bad=0 f
+  for f in $LINK_TARGETS; do
+    if [ -L "$f" ] && [ "$(readlink "$f")" = "$CANON" ]; then :; else bad=$((bad+1)); fi
+  done
+  grep -qF "@$CANON" "$HOME/.claude/CLAUDE.md" 2>/dev/null || bad=$((bad+1))
+  printf '%s' "$bad"
+}
+
+
+refuse_agent() {
+  printf '\n'
+  printf '  %s╭%s╮%s\n' "$C_R" "$(rep '─' $((W-4)))" "$C_RST"
+  printf '  %s│%s %sHUMAN APPROVAL REQUIRED%s%s%s│%s\n' "$C_R" "$C_RST" "$C_B" "$C_RST" "$(rep ' ' $((W-28)))" "$C_R" "$C_RST"
+  printf '  %s╰%s╯%s\n' "$C_R" "$(rep '─' $((W-4)))" "$C_RST"
+  printf '\n'
+  printf '  This looks like an AI agent (%s).\n' "$1"
+  printf '  Editing the global rules is a human-only action. It is not\n'
+  printf '  available to you, and no flag or env var unlocks it.\n\n'
+  printf '  %sWhat to do instead:%s\n' "$C_B" "$C_RST"
+  printf '    1. Write the change you want as a proposal:\n'
+  printf '         %srules propose --section "<name>" < new-content.txt%s\n' "$C_C" "$C_RST"
+  printf '    2. Tell the human a proposal is waiting.\n'
+  printf '    3. Stop. Do not edit %s directly.\n\n' "$CANON"
+  printf '  The human runs %srules review%s to accept or reject it.\n\n' "$C_C" "$C_RST"
+  exit 1
+}
+
+require_human() {
+  local why
+  if why=$(agent_detected); then refuse_agent "$why"; fi
+}
+
+# ------------------------------------------------------------- sections -----
+# Prints "lineno<TAB>title" for every "## " heading.
+sections() { grep -n '^## ' "$CANON" 2>/dev/null | sed 's/^\([0-9]*\):## /\1\t/'; }
+
+section_count() { sections | wc -l | tr -d ' '; }
+
+# Strips a leading "3. " numbering so "3. Branch names" matches "Branch names".
+norm_title() { printf '%s' "$1" | sed 's/^[0-9][0-9]*\. *//'; }
+
+# Given a 1-based index, prints "start<TAB>end" line numbers of that section.
+section_bounds() {
+  local want=$1 i=0 start="" end=""
+  while IFS=$'\t' read -r ln title; do
+    i=$((i+1))
+    if [ "$i" -eq "$want" ]; then start=$ln; continue; fi
+    if [ -n "$start" ] && [ -z "$end" ]; then end=$((ln-1)); fi
+  done <<EOF
+$(sections)
+EOF
+  [ -z "$start" ] && return 1
+  [ -z "$end" ] && end=$(wc -l < "$CANON" | tr -d ' ')
+  printf '%s\t%s\n' "$start" "$end"
+}
+
+# Replaces lines [start,end] of $CANON with the contents of $2.
+replace_range() {
+  local start=$1 end=$2 newfile=$3 tmp="$CANON.tmp.$$"
+  awk -v s="$start" -v e="$end" -v nf="$newfile" '
+    NR==s { while ((getline line < nf) > 0) print line; close(nf); next }
+    NR>s && NR<=e { next }
+    { print }
+  ' "$CANON" > "$tmp" && mv "$tmp" "$CANON"
+}
+
+# Replaces the body of a section, keeping its "## " heading intact.
+apply_section_body() {
+  local start=$1 end=$2 body=$3 tmp="$STATE/body.$$"
+  { printf '\n'; cat "$body"; printf '\n'; } > "$tmp"
+  replace_range $((start+1)) "$end" "$tmp"
+  rm -f "$tmp"
+}
+
+# Appends a new section, normalising trailing blank lines first.
+append_section() {
+  local title=$1 body=$2 tmp="$STATE/app.$$"
+  awk '{ l[NR]=$0 } END { last=NR; while (last>0 && l[last]=="") last--
+       for (i=1;i<=last;i++) print l[i] }' "$CANON" > "$tmp"
+  printf '\n## %s\n\n' "$title" >> "$tmp"
+  cat "$body" >> "$tmp"
+  mv "$tmp" "$CANON"
+}
+
+# ------------------------------------------------------------ commands ------
+cmd_dashboard() {
+  banner "global agent rules"
+  printf '\n'
+
+  if [ ! -f "$CANON" ]; then
+    printf '  %sNo rules file yet.%s\n\n' "$C_Y" "$C_RST"
+    printf '  rules keeps your engineering rules in one file that every\n'
+    printf '  AI tool reads. Create a starter file to begin.\n'
+    if [ "$INTERACTIVE" = "1" ]; then
+      local k
+      k=$(menu "›" "c|create a starter rules file" "q|quit")
+      case "$k" in
+        c|C) printf '\n'; cmd_init; printf '\n'; cmd_dashboard; return 0 ;;
+        *)   printf '\n'; return 0 ;;
+      esac
+    else
+      printf '\n  run: rules init\n\n'
+    fi
+    return 0
+  fi
+
+  printf '  %s\n\n' "$(verdict)"
+
+  local lines size mt cur appr np total bad
+  lines=$(wc -l < "$CANON" | tr -d ' ')
+  size=$(human_size "$(wc -c < "$CANON" | tr -d ' ')")
+  mt=$(mtime "$CANON")
+  cur=$(hash_of "$CANON")
+  appr=$(cat "$APPROVED" 2>/dev/null || echo "")
+  np=0; [ -d "$PROPOSALS" ] && np=$(ls -1 "$PROPOSALS"/*.proposal 2>/dev/null | wc -l | tr -d ' ')
+  total=$(link_total); bad=$(link_problems)
+
+  printf '  %s%s%s\n' "$C_D" "$(rep '─' $((W-4)))" "$C_RST"
+  printf '   %s%-11s%s %s\n' "$C_D" "rules" "$C_RST" "$CANON"
+  if [ -z "$appr" ]; then
+    printf '   %s%-11s%s %s\n' "$C_D" "approved" "$C_RST" "${C_Y}never approved${C_RST} · $lines lines · $size"
+  elif [ "$cur" = "$appr" ]; then
+    printf '   %s%-11s%s %s\n' "$C_D" "approved" "$C_RST" "$lines lines · $(section_count) sections · edited $(ago "$mt")"
+  else
+    printf '   %s%-11s%s %s\n' "$C_D" "approved" "$C_RST" "${C_R}changed outside the CLI${C_RST} · $lines lines"
+  fi
+  if [ "$bad" -eq 0 ]; then
+    printf '   %s%-11s%s %s\n' "$C_D" "tools" "$C_RST" "${C_G}$total/$total linked${C_RST}"
+  else
+    printf '   %s%-11s%s %s\n' "$C_D" "tools" "$C_RST" "${C_Y}$((total-bad))/$total linked${C_RST} · run: rules sync"
+  fi
+  printf '   %s%-11s%s %s\n' "$C_D" "hooks" "$C_RST" "$(hook_summary)"
+  if [ "$np" -eq 0 ]; then
+    printf '   %s%-11s%s %s\n' "$C_D" "proposals" "$C_RST" "none waiting"
+  else
+    printf '   %s%-11s%s %s\n' "$C_D" "proposals" "$C_RST" "${C_M}$np waiting${C_RST}"
+  fi
+  printf '  %s%s%s\n' "$C_D" "$(rep '─' $((W-4)))" "$C_RST"
+
+  if [ "$INTERACTIVE" != "1" ]; then
+    printf '\n  %se%s edit   %sr%s review   %sc%s check   %s?%s help\n\n' \
+      "$C_C" "$C_RST" "$C_C" "$C_RST" "$C_C" "$C_RST" "$C_C" "$C_RST"
+    return 0
+  fi
+
+  local k
+  k=$(menu "›" "e|edit the rules" "r|review proposals" "c|health check" "?|all commands" "q|quit")
+  case "$k" in
+    e|E) printf '\n'; cmd_edit ;;
+    r|R) printf '\n'; cmd_review ;;
+    c|C) printf '\n'; cmd_check ;;
+    '?') printf '\n'; cmd_help ;;
+    *)   printf '\n' ;;
+  esac
+}
+
+cmd_show() { [ -f "$CANON" ] && cat "$CANON" || { bad "no rules file"; exit 1; }; }
+
+cmd_path() { echo "$CANON"; }
+
+cmd_check() {
+  banner "health check"
+  printf '\n'
+
+  if [ ! -f "$CANON" ]; then
+    bad "no rules file at $CANON"
+    printf '\n  %srun: rules init%s\n\n' "$C_D" "$C_RST"
+    return 1
+  fi
+
+  local problems=0 cur appr bad_links total hn h f
+  cur=$(hash_of "$CANON"); appr=$(cat "$APPROVED" 2>/dev/null || echo "")
+  total=$(link_total); bad_links=$(link_problems)
+
+  printf '  %s%s%s\n' "$C_D" "$(rep '─' $((W-4)))" "$C_RST"
+  printf '   %s%-12s%s %s\n' "$C_D" "rules file" "$C_RST" "${C_G}✓${C_RST} $CANON"
+
+  if [ -z "$appr" ]; then
+    printf '   %s%-12s%s %s\n' "$C_D" "approval" "$C_RST" "${C_Y}!${C_RST} never approved · run: rules approve"
+    problems=$((problems+1))
+  elif [ "$cur" = "$appr" ]; then
+    printf '   %s%-12s%s %s\n' "$C_D" "approval" "$C_RST" "${C_G}✓${C_RST} matches last human approval"
+  else
+    printf '   %s%-12s%s %s\n' "$C_D" "approval" "$C_RST" "${C_R}✗${C_RST} changed outside the CLI"
+    problems=$((problems+1))
+  fi
+
+  if [ "$bad_links" -eq 0 ]; then
+    printf '   %s%-12s%s %s\n' "$C_D" "tools" "$C_RST" "${C_G}✓${C_RST} $total/$total linked"
+  else
+    printf '   %s%-12s%s %s\n' "$C_D" "tools" "$C_RST" "${C_R}✗${C_RST} $((total-bad_links))/$total linked · run: rules sync"
+    problems=$((problems+1))
+  fi
+
+  hn=0
+  for h in pre-commit commit-msg pre-push; do [ -x "$HOOKDIR/$h" ] && hn=$((hn+1)); done
+  if [ "$hn" -eq 3 ]; then
+    printf '   %s%-12s%s %s\n' "$C_D" "hooks" "$C_RST" "${C_G}✓${C_RST} 3/3 executable"
+  else
+    printf '   %s%-12s%s %s\n' "$C_D" "hooks" "$C_RST" "${C_R}✗${C_RST} $hn/3 executable"
+    problems=$((problems+1))
+  fi
+  printf '  %s%s%s\n\n' "$C_D" "$(rep '─' $((W-4)))" "$C_RST"
+
+  if [ "$problems" -eq 0 ]; then
+    printf '  %s✓ All checks passed.%s\n\n' "$C_G" "$C_RST"
+    return 0
+  fi
+
+  if [ "$problems" -eq 1 ]; then
+    printf '  %s1 problem found.%s\n\n' "$C_R" "$C_RST"
+  else
+    printf '  %s%d problems found.%s\n\n' "$C_R" "$problems" "$C_RST"
+  fi
+
+  if [ "$bad_links" -gt 0 ]; then
+    for f in $LINK_TARGETS; do
+      if [ -L "$f" ] && [ "$(readlink "$f")" = "$CANON" ]; then :; else
+        printf '    %s✗%s %s\n' "$C_R" "$C_RST" "$f"
+      fi
+    done
+    grep -qF "@$CANON" "$HOME/.claude/CLAUDE.md" 2>/dev/null || \
+      printf '    %s✗%s %s\n' "$C_R" "$C_RST" "$HOME/.claude/CLAUDE.md (import missing)"
+    printf '\n'
+  fi
+  return 1
+}
+
+cmd_sync() { exec "$RULES_HOME/bin/sync-agent-rules.sh"; }
+
+cmd_project() {
+  banner "precedence in $PWD"
+  printf '\n'
+  local d="$PWD" found=0
+  while [ "$d" != "/" ]; do
+    for f in AGENTS.md CLAUDE.md .cursorrules GEMINI.md; do
+      if [ -f "$d/$f" ]; then
+        printf '  %s%s%s/%s\n' "$C_C" "$d" "$C_RST" "$f"
+        found=$((found+1))
+      fi
+    done
+    d=$(dirname "$d")
+  done
+  if [ "$found" -eq 0 ]; then
+    printf '  %s(no project file - only the global rules apply)%s\n' "$C_D" "$C_RST"
+    printf '  %s%s%s\n' "$C_C" "$CANON" "$C_RST"
+  else
+    printf '\n  %sclosest file wins%s\n' "$C_D" "$C_RST"
+  fi
+  printf '\n'
+}
+
+cmd_hooks() {
+  banner "hooks"
+  printf '\n'
+  local h
+  for h in pre-commit commit-msg pre-push; do
+    if [ -x "$HOOKDIR/$h" ]; then ok "$h"
+    else bad "$h"; fi
+  done
+  printf '\n'
+  row "DISPATCH" "$HOME/.git-hooks/_dispatch"
+  row "HOOKSPATH" "$(git config --global core.hooksPath 2>/dev/null || echo 'unset')"
+  printf '\n'
+  if [ -f "$BLOCKS" ] && [ -s "$BLOCKS" ]; then
+    printf '  %srecent blocks%s\n' "$C_D" "$C_RST"
+    tail -5 "$BLOCKS" | while IFS=$'\t' read -r ts kind detail; do
+      printf '    %s%s%s  %s\n' "$C_D" "$ts" "$C_RST" "$detail"
+    done
+    printf '\n'
+  fi
+}
+
+cmd_log() {
+  banner "audit trail"
+  printf '\n'
+  if [ -f "$AUDIT" ] && [ -s "$AUDIT" ]; then
+    tail -30 "$AUDIT" | while IFS=$'\t' read -r ts who what; do
+      printf '  %s%s%s  %s%-6s%s %s\n' "$C_D" "$ts" "$C_RST" "$C_C" "$who" "$C_RST" "$what"
+    done
+  else
+    dim "nothing recorded yet"
+  fi
+  printf '\n'
+}
+
+# ---------------------------------------------------------------- edit ------
+cmd_edit() {
+  require_human
+  ensure_dirs
+  [ -f "$CANON" ] || { bad "no rules file at $CANON"; exit 1; }
+
+  if [ "${1:-}" = "--full" ]; then
+    local ed="${EDITOR:-${VISUAL:-nano}}"
+    printf '\n  opening %s in %s\n' "$CANON" "$ed"
+    printf '  %sthis is a human-only action%s\n\n' "$C_D" "$C_RST"
+    "$ed" "$CANON"
+    hash_of "$CANON" > "$APPROVED"
+    audit "edited (full file)"
+    ok "saved and approved"
+    return 0
+  fi
+
+  while :; do
+    local titles=() ln title i=0
+    while IFS=$'\t' read -r ln title; do
+      titles[${#titles[@]}]="$title"
+    done <<EOF
+$(sections)
+EOF
+    local n=${#titles[@]}
+    titles[$n]="+ add a new section"
+
+    local choice
+    choice=$(pick "Which section do you want to edit?" "${titles[@]}")
+    [ "$choice" = "0" ] && { printf '\n'; return 0; }
+
+    # ---- add a new section ----
+    if [ "$choice" -eq $((n+1)) ]; then
+      printf '\n  %sNew section title:%s ' "$C_D" "$C_RST"
+      read -r title
+      [ -z "$title" ] && continue
+      printf '  %sType the content, then press Ctrl-D.%s\n\n' "$C_D" "$C_RST"
+      local ntmp="$STATE/new.$$"
+      : > "$ntmp"
+      while IFS= read -r line; do
+        [ "$line" = "." ] && break
+        printf '%s\n' "$line" >> "$ntmp"
+      done
+      if [ -s "$ntmp" ]; then
+        append_section "$title" "$ntmp"
+        hash_of "$CANON" > "$APPROVED"
+        audit "added section: $title"
+        printf '\n'; ok "added '$title'"
+      else
+        dim "cancelled"
+      fi
+      rm -f "$ntmp"
+      continue
+    fi
+
+    # ---- edit an existing section ----
+    title="${titles[$((choice-1))]}"
+    local bounds start end
+    bounds=$(section_bounds "$choice")
+    start=$(printf '%s' "$bounds" | cut -f1)
+    end=$(printf '%s' "$bounds" | cut -f2)
+
+    printf '\n  %s%s%s\n' "$C_B" "$title" "$C_RST"
+    printf '  %s\n' "$(rep '─' $((W-6)))"
+    sed -n "$((start+1)),${end}p" "$CANON" | sed 's/^/  /'
+    printf '  %s\n\n' "$(rep '─' $((W-6)))"
+    printf '  %sType the new content, then press Ctrl-D.%s\n' "$C_D" "$C_RST"
+    printf '  %sA line with just a dot also finishes. Ctrl-C cancels.%s\n\n' "$C_D" "$C_RST"
+
+    local tmp="$STATE/edit.$$" old="$STATE/old.$$"
+    : > "$tmp"
+    while IFS= read -r line; do
+      [ "$line" = "." ] && break
+      printf '%s\n' "$line" >> "$tmp"
+    done
+
+    if [ ! -s "$tmp" ]; then
+      local k
+      k=$(menu "This section will be empty. Delete it?" "d|delete it" "c|keep it")
+      case "$k" in
+        d|D) replace_range "$start" "$end" /dev/null
+             hash_of "$CANON" > "$APPROVED"
+             audit "deleted section: $title"
+             printf '\n'; ok "deleted '$title'" ;;
+        *)   dim "cancelled" ;;
+      esac
+      rm -f "$tmp"
+      continue
+    fi
+
+    sed -n "$((start+1)),${end}p" "$CANON" > "$old"
+    printf '\n  %sChanges%s\n' "$C_B" "$C_RST"
+    trim_blanks "$old" > "$old.t"; trim_blanks "$tmp" > "$tmp.t"
+    diff -u "$old.t" "$tmp.t" 2>/dev/null | tail -n +3 | colorize_diff
+    rm -f "$old.t" "$tmp.t"
+    printf '\n'
+
+    local k
+    k=$(menu "Save this change?" "s|save" "c|cancel")
+    case "$k" in
+      s|S) apply_section_body "$start" "$end" "$tmp"
+           hash_of "$CANON" > "$APPROVED"
+           audit "edited section: $title"
+           printf '\n'; ok "saved '$title'" ;;
+      *)   dim "cancelled" ;;
+    esac
+    rm -f "$tmp" "$old"
+  done
+}
+
+# ------------------------------------------------------------- propose ------
+cmd_propose() {
+  ensure_dirs
+  local kind="section" section="" file=""
+
+  while [ $# -gt 0 ]; do
+    case "$1" in
+      --section) section="${2:-}"; shift 2 ;;
+      --append)  kind="append"; shift ;;
+      --replace) kind="replace"; shift ;;
+      --file)    file="${2:-}"; shift 2 ;;
+      -h|--help)
+        printf '\n  rules propose --section "<name>" < new-content.txt\n'
+        printf '  rules propose --append < new-content.txt\n'
+        printf '  rules propose --replace --file new-rules.md\n\n'
+        printf '  Writes a proposal. Never changes the rules. A human must\n'
+        printf '  run `rules review` to accept it.\n\n'
+        return 0 ;;
+      *) shift ;;
+    esac
+  done
+
+  local body="$STATE/proposal-body.$$"
+  if [ -n "$file" ]; then
+    [ -f "$file" ] || { bad "no such file: $file"; exit 1; }
+    cp "$file" "$body"
+  else
+    cat > "$body"
+  fi
+
+  if [ ! -s "$body" ]; then
+    bad "empty proposal"
+    rm -f "$body"
+    exit 1
+  fi
+
+  local who="unknown"
+  local a; a=$(agent_detected) && who="$a"
+  RULES_ACTOR="$who"
+
+  local slug ts out
+  slug=$(printf '%s' "${section:-$kind}" | tr '[:upper:]' '[:lower:]' | tr -cs 'a-z0-9' '-' | sed 's/^-//;s/-$//')
+  [ -z "$slug" ] && slug="change"
+  ts=$(date -u +%Y%m%dT%H%M%SZ)
+  out="$PROPOSALS/$ts-$slug.proposal"
+
+  {
+    printf 'kind: %s\n' "$kind"
+    printf 'section: %s\n' "$section"
+    printf 'created: %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+    printf 'author: %s\n' "$who"
+    printf '%s\n' '---'
+    cat "$body"
+  } > "$out"
+  rm -f "$body"
+
+  audit "proposed ($kind${section:+: $section})"
+
+  printf '\n'
+  ok "proposal written"
+  row "FILE" "$out"
+  row "KIND" "$kind${section:+ · $section}"
+  printf '\n'
+  printf '  %sThis did not change the rules.%s\n' "$C_Y" "$C_RST"
+  printf '  A human must run %srules review%s to accept or reject it.\n\n' "$C_C" "$C_RST"
+}
+
+# -------------------------------------------------------------- review ------
+cmd_review() {
+  require_human
+  ensure_dirs
+
+  local list
+  list=$(ls -1 "$PROPOSALS"/*.proposal 2>/dev/null)
+  if [ -z "$list" ]; then
+    banner "review"
+    printf '\n  %sNothing waiting for review.%s\n\n' "$C_D" "$C_RST"
+    return 0
+  fi
+
+  local f
+  for f in $list; do
+    banner "review"
+    printf '\n'
+    local kind section created author
+    kind=$(sed -n 's/^kind: //p' "$f" | head -1)
+    section=$(sed -n 's/^section: //p' "$f" | head -1)
+    created=$(sed -n 's/^created: //p' "$f" | head -1)
+    author=$(sed -n 's/^author: //p' "$f" | head -1)
+
+    printf '   %s%-11s%s %s\n' "$C_D" "section" "$C_RST" "${section:-$kind}"
+    printf '   %s%-11s%s %s\n' "$C_D" "from" "$C_RST" "$author"
+    printf '   %s%-11s%s %s\n' "$C_D" "when" "$C_RST" "$created"
+
+    local proposed="$STATE/prop.$$" current="$STATE/cur.$$"
+    sed -n '/^---$/,$p' "$f" | sed '1d' > "$proposed"
+
+    case "$kind" in
+      replace|append) cp "$CANON" "$current" ;;
+      *)
+        local idx=0 i=0 ln title
+        while IFS=$'\t' read -r ln title; do
+          i=$((i+1))
+          [ "$(norm_title "$title")" = "$(norm_title "$section")" ] && idx=$i
+        done <<EOF
+$(sections)
+EOF
+        if [ "$idx" -gt 0 ]; then
+          local b s e
+          b=$(section_bounds "$idx")
+          s=$(printf '%s' "$b" | cut -f1)
+          e=$(printf '%s' "$b" | cut -f2)
+          sed -n "$((s+1)),${e}p" "$CANON" > "$current"
+        else
+          : > "$current"
+        fi
+        ;;
+    esac
+
+    printf '\n  %sChanges%s\n' "$C_B" "$C_RST"
+    trim_blanks "$current" > "$current.t"; trim_blanks "$proposed" > "$proposed.t"
+    if diff -q "$current.t" "$proposed.t" >/dev/null 2>&1; then
+      printf '  %s(no textual change)%s\n' "$C_D" "$C_RST"
+    else
+      diff -u "$current.t" "$proposed.t" 2>/dev/null | tail -n +3 | colorize_diff
+    fi
+    rm -f "$current.t" "$proposed.t"
+    printf '\n'
+
+    local k
+    k=$(menu "What do you want to do?" "a|accept" "r|reject" "s|skip" "q|quit")
+    case "$k" in
+      a|A)
+        local body="$STATE/apply.$$"
+        cp "$proposed" "$body"
+        case "$kind" in
+          append)
+            printf '\n' >> "$CANON"; cat "$body" >> "$CANON" ;;
+          replace)
+            cp "$body" "$CANON" ;;
+          *)
+            local idx=0 i=0 ln title
+            while IFS=$'\t' read -r ln title; do
+              i=$((i+1))
+              [ "$(norm_title "$title")" = "$(norm_title "$section")" ] && idx=$i
+            done <<EOF
+$(sections)
+EOF
+            if [ "$idx" -eq 0 ]; then
+              local k2
+              k2=$(menu "No section named '$section'. Add it as new?" "y|add it" "n|cancel")
+              case "$k2" in
+                y|Y) append_section "$section" "$body" ;;
+                *)   dim "cancelled, proposal kept"; rm -f "$body" "$current" "$proposed"; continue ;;
+              esac
+            else
+              local bounds start end
+              bounds=$(section_bounds "$idx")
+              start=$(printf '%s' "$bounds" | cut -f1)
+              end=$(printf '%s' "$bounds" | cut -f2)
+              apply_section_body "$start" "$end" "$body"
+            fi
+            ;;
+        esac
+        rm -f "$body"
+        hash_of "$CANON" > "$APPROVED"
+        audit "accepted proposal: $(basename "$f")"
+        rm -f "$f"
+        printf '\n'; ok "accepted"
+        ;;
+      r|R) rm -f "$f"; audit "rejected proposal: $(basename "$f")"; printf '\n'; ok "rejected" ;;
+      q|Q) rm -f "$current" "$proposed"; printf '\n'; return 0 ;;
+      *)   dim "skipped" ;;
+    esac
+    rm -f "$current" "$proposed"
+    printf '\n'
+  done
+}
+
+cmd_approve() {
+  require_human
+  ensure_dirs
+  hash_of "$CANON" > "$APPROVED"
+  audit "approved current content"
+  ok "approved"
+}
+
+# ---------------------------------------------------------------- test ------
+cmd_test() { exec "$RULES_HOME/test/run.sh"; }
+
+cmd_init() {
+  ensure_dirs
+  if [ -f "$CANON" ]; then
+    warn "$CANON already exists"
+    printf '  %suse: rules edit%s\n\n' "$C_D" "$C_RST"
+    return 0
+  fi
+  cat > "$CANON" <<'EOF'
+# Global agent rules
+
+These rules apply to every project, in every AI tool, with every model.
+
+Edit this file any time with `rules`. Check what applies where with `rules project`.
+
+## Precedence
+
+Closest file wins. A project that needs different rules puts them in its own
+`AGENTS.md` or `CLAUDE.md` at the repo root, and that file overrides this one.
+
+## Editing these rules
+
+Never edit this file directly. Use `rules propose` and wait for a human to
+run `rules review`. Editing the global rules always requires human approval.
+EOF
+  hash_of "$CANON" > "$APPROVED"
+  audit "initialised"
+  ok "created $CANON"
+  printf '  %snext: rules sync%s\n\n' "$C_D" "$C_RST"
+}
+
+cmd_help() {
+  banner "help"
+  printf '\n'
+  printf '  %sHuman only%s\n' "$C_B" "$C_RST"
+  printf '    %sedit%s       edit the rules, section by section\n' "$C_C" "$C_RST"
+  printf '    %sreview%s     accept or reject proposals\n' "$C_C" "$C_RST"
+  printf '    %sapprove%s    mark the current content as approved\n\n' "$C_C" "$C_RST"
+
+  printf '  %sAgents use this%s\n' "$C_B" "$C_RST"
+  printf '    %spropose%s    write a change request, applies nothing\n\n' "$C_C" "$C_RST"
+
+  printf '  %sRead only%s\n' "$C_B" "$C_RST"
+  printf '    %srules%s      dashboard\n' "$C_C" "$C_RST"
+  printf '    %sshow%s       print the rules\n' "$C_C" "$C_RST"
+  printf '    %scheck%s      health check\n' "$C_C" "$C_RST"
+  printf '    %sproject%s    which rules file wins here\n' "$C_C" "$C_RST"
+  printf '    %shooks%s      hook status and recent blocks\n' "$C_C" "$C_RST"
+  printf '    %slog%s        audit trail\n' "$C_C" "$C_RST"
+  printf '    %stest%s       run the hook test suite\n' "$C_C" "$C_RST"
+  printf '    %spath%s       print the rules file path\n\n' "$C_C" "$C_RST"
+
+  printf '  %sSetup%s\n' "$C_B" "$C_RST"
+  printf '    %sinit%s       create a starter rules file\n' "$C_C" "$C_RST"
+  printf '    %ssync%s       re-link into every agent config\n\n' "$C_C" "$C_RST"
+
+  printf '  %sExamples%s\n' "$C_B" "$C_RST"
+  printf '    %srules propose --section "Branch names" < new.txt%s\n' "$C_D" "$C_RST"
+  printf '    %srules edit --full%s\n\n' "$C_D" "$C_RST"
+
+  printf '  %sEditing the global rules always requires a human.%s\n' "$C_Y" "$C_RST"
+  printf '  Agents are refused and pointed at %srules propose%s.\n\n' "$C_C" "$C_RST"
+}
+
+# -------------------------------------------------------------- dispatch ----
+ui_init
+cmd="${1:-dashboard}"
+[ $# -gt 0 ] && shift
+
+case "$cmd" in
+  dashboard|"") cmd_dashboard ;;
+  edit)    cmd_edit "$@" ;;
+  propose) cmd_propose "$@" ;;
+  review)  cmd_review ;;
+  approve) cmd_approve ;;
+  show|cat) cmd_show ;;
+  path)    cmd_path ;;
+  check)   cmd_check ;;
+  sync)    cmd_sync ;;
+  project) cmd_project ;;
+  hooks)   cmd_hooks ;;
+  log)     cmd_log ;;
+  test)    cmd_test ;;
+  init)    cmd_init ;;
+  version|--version|-v) echo "rules $VERSION" ;;
+  help|-h|--help) cmd_help ;;
+  *) bad "unknown command: $cmd"; printf '  %srun: rules help%s\n\n' "$C_D" "$C_RST"; exit 1 ;;
+esac
