@@ -10,7 +10,7 @@ say() { printf '  %s\n' "$1"; }
 ok()  { printf '  \033[32m✓\033[0m %s\n' "$1"; }
 warn(){ printf '  \033[33m!\033[0m %s\n' "$1"; }
 
-printf '\n  rules installer\n  ────────────────────────────────────────────\n\n'
+printf '\n  Agent Rules installer\n  ────────────────────────────────────────────\n\n'
 
 # 1. CLI on PATH
 mkdir -p "$BIN_DIR"

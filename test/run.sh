@@ -25,7 +25,7 @@ t() { # name expected actual
   fi
 }
 
-printf '\n  %srules%s %s· hook test suite%s\n' "$B" "$X" "$D" "$X"
+printf '\n  %sAgent Rules%s %s· hook test suite%s\n' "$B" "$X" "$D" "$X"
 printf '  %s%s%s\n\n' "$D" "$(printf '─%.0s' $(seq 1 60))" "$X"
 
 T=$(mktemp -d)/rules-test
