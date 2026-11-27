@@ -1,4 +1,4 @@
-# How it works
+# How Agent Rules works
 
 Three mechanisms, each doing one job.
 

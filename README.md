@@ -1,4 +1,4 @@
-# rules
+# Agent Rules
 
 One file of rules for every AI coding tool.
 
@@ -9,7 +9,7 @@ once and every tool follows.
 Agents can propose changes. Only you can apply them.
 
 ```
-  rules · global agent rules
+  Agent Rules
   ────────────────────────────────────────────────────────────
 
   ✓ Everything is in order.

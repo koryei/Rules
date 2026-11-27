@@ -87,7 +87,7 @@ linked, and every hook is executable. Exits non-zero if anything is wrong.
 Walk up from the current directory and report which rules file wins.
 
 ```
-  rules · precedence in ~/code/myproject
+  Agent Rules · precedence in ~/code/myproject
   ────────────────────────────────────────────
 
   /Users/you/code/myproject/CLAUDE.md

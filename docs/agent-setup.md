@@ -1,4 +1,4 @@
-# Let an AI agent set up rules
+# Let an AI agent set up Agent Rules
 
 Copy the box below into any AI agent. It works with Claude Code, Codex, Cursor,
 Gemini CLI, Windsurf, opencode, or anything else that can run shell commands.
