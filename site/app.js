@@ -5,10 +5,6 @@ document.documentElement.classList.add('js');
 const $ = (s, root = document) => root.querySelector(s);
 const $$ = (s, root = document) => [...root.querySelectorAll(s)];
 const still = matchMedia('(prefers-reduced-motion: reduce)');
-const store = {
-  get(k) { try { return localStorage.getItem(k); } catch { return null; } },
-  set(k, v) { try { localStorage.setItem(k, v); } catch { /* private mode */ } },
-};
 
 // ------------------------------------------------------------------ painting --
 const scene = (() => {
@@ -184,24 +180,11 @@ for (const button of $$('[data-copy]')) {
 }
 
 // ------------------------------------------------------------------ shortcut --
-const toggle = $('#shortcut');
-const applyShortcut = () => {
-  document.documentElement.classList.toggle('shortcut-off', !toggle.checked);
-  const hero = $('#hero-copy');
-  if (toggle.checked) hero.setAttribute('aria-keyshortcuts', 'c');
-  else hero.removeAttribute('aria-keyshortcuts');
-};
-toggle.checked = store.get('agent-rules:shortcut') !== 'off';
-applyShortcut();
-toggle.addEventListener('change', () => {
-  store.set('agent-rules:shortcut', toggle.checked ? 'on' : 'off');
-  applyShortcut();
-});
-
+// C copies the prompt, unless the person is typing or holding a modifier.
 addEventListener('keydown', (e) => {
-  if (!toggle.checked || e.key.toLowerCase() !== 'c') return;
+  if (e.key.toLowerCase() !== 'c') return;
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat) return;
-  if (e.target.closest?.('input:not([type="checkbox"]), textarea, select, [contenteditable]')) return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable]')) return;
   e.preventDefault();
   copyPrompt($('#hero-copy'));
 });
