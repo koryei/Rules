@@ -42,8 +42,9 @@ installer changes global git settings and agent config files on their machine.
 ## Brand Commitments
 
 Name shown to people: Agent Rules. Command typed: `rules`. MIT licensed.
-Website reference chosen by the owner: dark page, left-aligned headline, a
-"copy setup prompt" button, and a pixel-art night scene with a card on it.
+Website reference chosen by the owner: one screen, dark page, left-aligned
+headline, a "copy setup prompt" button, and a pixel-art night scene with a card
+on it.
 
 ## Evidence on Hand
 
