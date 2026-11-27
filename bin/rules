@@ -544,6 +544,7 @@ cmd_hooks() {
   fi
   printf '\n'
   row "DISPATCH" "$HOME/.git-hooks/_dispatch"
+  row "POLICY" "$(dispatcher_policy_dir "$HOME/.git-hooks")"
   row "HOOKSPATH" "$(git config --global core.hooksPath 2>/dev/null || echo 'unset')"
   printf '\n'
   if [ -f "$BLOCKS" ] && [ -s "$BLOCKS" ]; then
