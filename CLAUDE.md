@@ -12,4 +12,4 @@ agent rules.
 - The setup prompt exists in three places that must say the same thing:
   `site/index.html`, `README.md`, `docs/agent-setup.md`.
 - Terminal output shown on the site is real. Recapture it if CLI messages change.
-- Tests: `test/run.sh`. Product and design notes: `PRODUCT.md`, `DESIGN.md`.
+- Tests: `test/run.sh` (hooks) and `test/install.sh` (installer, from PR #3). Product and design notes: `PRODUCT.md`, `DESIGN.md`.
