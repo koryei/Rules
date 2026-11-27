@@ -11,5 +11,8 @@ agent rules.
   `.github/workflows/pages.yml` when `site/` changes on `main`.
 - The setup prompt exists in three places that must say the same thing:
   `site/index.html`, `README.md`, `docs/agent-setup.md`.
-- Terminal output shown on the site is real. Recapture it if CLI messages change.
-- Tests: `test/run.sh` (hooks) and `test/install.sh` (installer, from PR #3). Product and design notes: `PRODUCT.md`, `DESIGN.md`.
+- The site is one screen: nav, hero, prompt card, painting behind. The page
+  never scrolls; the card scrolls inside itself when the prompt does not fit.
+  Check any layout change at phone, tablet, laptop and landscape sizes.
+- Tests: `test/run.sh` (hooks) and `test/install.sh` (installer). Product and
+  design notes: `PRODUCT.md`, `DESIGN.md`.

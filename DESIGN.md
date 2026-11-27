@@ -20,9 +20,20 @@ self-hosted. Sizes: 13, 15, 17, 20px and two fluid headings. Weights 400 and 550
 
 ## Shape and motion
 
-4px grid. Radius 3 to 8px. Hairline rules at the page edges. One entrance (the
-lanterns light) and one response (the gates open on copy). Nothing loops.
-Easing `cubic-bezier(0.22, 1, 0.36, 1)`.
+4px grid. Radius 3 to 8px. One entrance (the lanterns light) and one response
+(the gates open on copy). Nothing loops. Easing
+`cubic-bezier(0.22, 1, 0.36, 1)`.
+
+## Layout
+
+One screen, no page scroll. The painting is a fixed layer behind everything and
+covers whatever shape the window is. Above it: the header, the hero, then the
+prompt card. The card grows with its content and stops at the space left, so
+the prompt scrolls inside the card rather than pushing the page down. A fade on
+the last line says there is more below.
+
+Short windows drop the lead paragraph and tighten the type before anything is
+allowed to overflow. The card is never taller than the screen.
 
 ## Painting
 
