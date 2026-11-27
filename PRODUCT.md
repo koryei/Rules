@@ -60,4 +60,4 @@ testimonials or usage numbers. Do not invent any.
 ## Accessibility & Inclusion
 
 Keyboard operable, WCAG 2.2 AA contrast, reduced motion respected, readable
-without JavaScript. The single-key shortcut can be turned off.
+without JavaScript. The single-key shortcut never fires while you are typing.
