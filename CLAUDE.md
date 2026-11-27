@@ -5,7 +5,7 @@ agent rules.
 
 - One rules file for every AI coding tool, with human approval to change it.
   Bash CLI in `bin/rules`, git hooks in `hooks/`, installer in `install.sh`.
-- GitHub: `koryei/rules`. Website: https://koryei.github.io/rules/
+- GitHub: `koryei/Rules`. Website: https://koryei.github.io/Rules/
 - Local checkout folder is named `Agent Rules`. The command stays `rules`.
 - Website is static files in `site/`, deployed by
   `.github/workflows/pages.yml` when `site/` changes on `main`.
