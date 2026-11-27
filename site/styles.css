@@ -290,14 +290,6 @@ kbd {
   font-size: 13px;
 }
 
-.shortcut-off kbd {
-  display: none;
-}
-
-.shortcut-off .button:has(kbd) {
-  padding-right: 20px;
-}
-
 .icon {
   width: 16px;
   height: 16px;
@@ -567,29 +559,6 @@ pre {
   line-height: 1.4;
 }
 
-.shortcut {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  color: var(--ink-3);
-  font: 400 13px/1 var(--mono);
-  white-space: nowrap;
-  cursor: pointer;
-  transition: color 160ms var(--ease);
-}
-
-.shortcut:hover {
-  color: var(--ink);
-}
-
-.shortcut input {
-  width: 16px;
-  height: 16px;
-  margin: 0;
-  accent-color: var(--lantern);
-}
-
-html:not(.js) .shortcut,
 html:not(.js) kbd,
 html:not(.js) .card-foot .button {
   display: none;
@@ -774,14 +743,8 @@ html:not(.js) .card-foot .button {
 /* Touch screens get 44px targets. */
 @media (pointer: coarse) {
   .tabs button,
-  .button-small,
-  .shortcut {
+  .button-small {
     min-height: 44px;
-  }
-
-  .shortcut input {
-    width: 20px;
-    height: 20px;
   }
 }
 
