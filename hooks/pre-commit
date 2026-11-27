@@ -1,0 +1,118 @@
+#!/bin/sh
+# Global pre-commit policy. Blocks the mistakes AI agents make most often.
+# Override a single check with the env var named in its message.
+set -u
+
+PROTECTED_RE='^(main|master|develop|release/.*)$'
+RED=$(printf '\033[31m'); YEL=$(printf '\033[33m'); DIM=$(printf '\033[2m'); RST=$(printf '\033[0m')
+
+fail() {
+  printf '\n%sx git-policy:%s %s\n' "$RED" "$RST" "$1" >&2
+  _log="$HOME/.config/git-policy/state/blocks.log"
+  mkdir -p "$(dirname "$_log")" 2>/dev/null
+  printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$0")" "$1" >> "$_log" 2>/dev/null
+}
+note() { printf '%s  %s%s\n' "$DIM" "$1" "$RST" >&2; }
+
+branch=$(git symbolic-ref --quiet --short HEAD 2>/dev/null || echo "")
+staged=$(git diff --cached --name-only --diff-filter=ACMR 2>/dev/null || echo "")
+
+# ---------------------------------------------------------------- 1. branch
+if [ "${GIT_POLICY_ALLOW_MAIN:-0}" != "1" ] \
+   && printf '%s' "$branch" | grep -Eq "$PROTECTED_RE"; then
+  # Allow the very first commit in a brand-new repo, and allow finishing a
+  # merge that is already in progress (blocking those leaves the repo stuck).
+  gitdir=$(git rev-parse --git-dir 2>/dev/null)
+  if ! git rev-parse --verify HEAD >/dev/null 2>&1; then
+    note "initial commit on '$branch' allowed"
+  elif [ -f "$gitdir/MERGE_HEAD" ]; then
+    note "merge in progress on '$branch' allowed"
+  else
+    fail "refusing to commit directly to protected branch '$branch'."
+    note "create a branch first:  git switch -c feat/<short-slug>"
+    note "one-off override:       GIT_POLICY_ALLOW_MAIN=1 git commit ..."
+    exit 1
+  fi
+fi
+
+[ -z "$staged" ] && exit 0
+
+# ------------------------------------------------------- 2. secret filenames
+bad_names=""
+for f in $staged; do
+  base=$(basename "$f")
+  case "$base" in
+    .env.example|.env.sample|.env.template|.env.dist) continue ;;
+  esac
+  case "$f" in
+    .env|*/.env|.env.*|*/.env.*) bad_names="$bad_names $f" ;;
+    *.pem|*.key|*.p12|*.pfx|*.keystore|*.jks) bad_names="$bad_names $f" ;;
+    id_rsa|id_dsa|id_ecdsa|id_ed25519|*/id_rsa|*/id_dsa|*/id_ecdsa|*/id_ed25519) bad_names="$bad_names $f" ;;
+    credentials.json|*/credentials.json) bad_names="$bad_names $f" ;;
+    .npmrc|*/.npmrc|.pypirc|*/.pypirc|.netrc|*/.netrc) bad_names="$bad_names $f" ;;
+    service-account*.json|*/service-account*.json) bad_names="$bad_names $f" ;;
+  esac
+done
+if [ -n "$bad_names" ]; then
+  fail "staged files look like secrets:"
+  for f in $bad_names; do note "  $f"; done
+  note "unstage them:  git restore --staged <file>"
+  note "and add the pattern to .gitignore"
+  exit 1
+fi
+
+# -------------------------------------------------------- 3. secret contents
+diff=$(git diff --cached -U0 --no-color 2>/dev/null || echo "")
+if [ -n "$diff" ]; then
+  hit=$(printf '%s' "$diff" | grep -E '^\+' | grep -Ev '^\+\+\+' | grep -Eo \
+    'AKIA[0-9A-Z]{16}|ghp_[A-Za-z0-9]{36}|gho_[A-Za-z0-9]{36}|ghs_[A-Za-z0-9]{36}|ghu_[A-Za-z0-9]{36}|github_pat_[A-Za-z0-9_]{22,}|sk-ant-[A-Za-z0-9_-]{20,}|sk-[A-Za-z0-9]{32,}|xox[baprs]-[A-Za-z0-9-]{10,}|AIza[0-9A-Za-z_-]{35}|-----BEGIN [A-Z ]*PRIVATE KEY-----' \
+    | head -5)
+  if [ -n "$hit" ]; then
+    fail "staged diff contains what looks like a credential:"
+    printf '%s\n' "$hit" | while IFS= read -r h; do
+      note "  $(printf '%s' "$h" | cut -c1-12)..."
+    done
+    note "remove it, rotate the key, and add the file to .gitignore"
+    note "if this is a false positive:  GIT_POLICY_SKIP_SECRET_SCAN=1 git commit ..."
+    [ "${GIT_POLICY_SKIP_SECRET_SCAN:-0}" = "1" ] || exit 1
+  fi
+fi
+
+# ------------------------------------------------------------ 4. large files
+big=""
+for f in $staged; do
+  size=$(git cat-file -s ":$f" 2>/dev/null || echo 0)
+  if [ "$size" -gt 5242880 ]; then
+    big="$big $f($((size / 1048576))MB)"
+  fi
+done
+if [ -n "$big" ]; then
+  fail "staged files exceed 5MB:$big"
+  note "use Git LFS:  git lfs track '<pattern>'"
+  exit 1
+fi
+
+# ------------------------------------------------------- 5. conflict markers
+if printf '%s' "$diff" | grep -Eq '^\+(<<<<<<< |>>>>>>> |=======$)'; then
+  fail "staged diff contains merge conflict markers."
+  exit 1
+fi
+
+# ------------------------------------------------- 6. junk that must not ship
+junk=""
+for f in $staged; do
+  case "$f" in
+    .DS_Store|*/.DS_Store|Thumbs.db|*/Thumbs.db) junk="$junk $f" ;;
+    node_modules/*|*/node_modules/*) junk="$junk $f" ;;
+    dist/*|*/dist/*|build/*|*/build/*) junk="$junk $f" ;;
+    __pycache__/*|*/__pycache__/*|*.pyc) junk="$junk $f" ;;
+    .venv/*|*/.venv/*|venv/*|*/venv/*) junk="$junk $f" ;;
+  esac
+done
+if [ -n "$junk" ]; then
+  fail "staged build/OS artifacts:$junk"
+  note "unstage them and add the pattern to .gitignore"
+  exit 1
+fi
+
+exit 0
