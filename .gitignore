@@ -1,0 +1,12 @@
+# runtime state, never committed
+state/
+proposals/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# editors
+.idea/
+.vscode/
+*.swp
