@@ -1,3 +1,7 @@
+# secrets, never committed
+.env*
+!.env.example
+
 # runtime state, never committed
 state/
 proposals/
