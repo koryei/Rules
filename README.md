@@ -47,6 +47,7 @@ Every AI tool wants its own config file.
 | crush | `~/.config/crush/CRUSH.md` |
 | goose | `~/.config/goose/.goosehints` |
 | Continue | `~/.continue/rules/global.md` |
+| Mistral Vibe | `~/.vibe/AGENTS.md` |
 
 Keep them in sync by hand and they drift within a week. `rules` points them all
 at one file, so they cannot drift.
