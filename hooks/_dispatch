@@ -1,0 +1,17 @@
+#!/bin/sh
+# Global git hook dispatcher.
+#   1. runs the policy hook of the same name (if any)
+#   2. hands off to the repo's own hook of the same name (if any)
+#
+# Every hook name is a symlink to this file. Add machine-local behaviour
+# (counters, notifications) above the policy call.
+name=$(basename "$0")
+
+policy="$HOME/.config/git-policy/hooks/$name"
+if [ -x "$policy" ]; then
+  "$policy" "$@" || exit $?
+fi
+
+local="$(git rev-parse --git-common-dir 2>/dev/null)/hooks/$name"
+[ -x "$local" ] && exec "$local" "$@"
+exit 0
