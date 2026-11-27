@@ -57,14 +57,25 @@ if [ ! -e "$HOOKS_DIR/_dispatch" ] && [ ! -L "$HOOKS_DIR/_dispatch" ]; then
   chmod +x "$HOOKS_DIR/_dispatch"
   ok "installed the hook dispatcher"
 elif grep -q 'git-policy/hooks' "$HOOKS_DIR/_dispatch" 2>/dev/null; then
-  ok "kept the dispatcher at $HOOKS_DIR/_dispatch"
+  if grep -q '_policy' "$HOOKS_DIR/_dispatch" 2>/dev/null; then
+    ok "kept the dispatcher at $HOOKS_DIR/_dispatch"
+  else
+    cp "$HERE/hooks/_dispatch" "$HOOKS_DIR/_dispatch"
+    chmod +x "$HOOKS_DIR/_dispatch"
+    warn "replaced the old dispatcher at $HOOKS_DIR/_dispatch"
+    say "  it looked for the policy hooks in one fixed path; re-add any local edits"
+  fi
 else
   usable=0
   warn "existing dispatcher at $HOOKS_DIR/_dispatch does not call the policy hooks"
   say "  add this before its local-hook handoff:"
-  say '    policy="$HOME/.config/git-policy/hooks/$name"'
+  say '    policy="$(cat "$HOME/.git-hooks/_policy")/$name"'
   say '    [ -x "$policy" ] && { "$policy" "$@" || exit $?; }'
 fi
+
+# Record where the policy hooks live, so the dispatcher finds them from any
+# clone location.
+printf '%s\n' "$HERE/hooks" > "$HOOKS_DIR/_policy"
 
 if [ "$usable" = "1" ]; then
   for h in applypatch-msg commit-msg post-applypatch post-checkout post-commit \
