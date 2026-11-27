@@ -208,13 +208,25 @@ verdict() {
   fi
 }
 
+# Where the installed dispatcher looks for the policy hooks. The installer
+# records it in _policy so the repo can live anywhere; an install that
+# predates that file falls back to the documented path.
+dispatcher_policy_dir() {
+  local d
+  d=$(cat "$1/_policy" 2>/dev/null)
+  [ -n "$d" ] || d="$HOME/.config/git-policy/hooks"
+  printf '%s' "$d"
+}
+
 # A policy hook is active only if git will run it: the global hooks path has to
-# hold a hook of that name which calls the policy hooks.
+# hold a hook of that name which calls the policy hooks, and the dispatcher has
+# to reach the policy hook from the directory it actually looks in.
 hook_active() {
   local dir
   dir=$(git config --global --path --get core.hooksPath 2>/dev/null)
-  [ -x "$HOOKDIR/$1" ] && [ -n "$dir" ] && [ -x "$dir/$1" ] \
-    && grep -q 'git-policy/hooks' "$dir/$1" 2>/dev/null
+  [ -x "$HOOKDIR/$1" ] && [ -n "$dir" ] && [ -x "$dir/$1" ] || return 1
+  grep -q 'git-policy/hooks' "$dir/$1" 2>/dev/null || return 1
+  [ -x "$(dispatcher_policy_dir "$dir")/$1" ]
 }
 
 hooks_active() {
