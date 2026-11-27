@@ -6,17 +6,15 @@ Gemini CLI, Windsurf, opencode, or anything else that can run shell commands.
 ```
 Install the `rules` CLI on this machine.
 
-0. Run `git config --global core.hooksPath` and check whether
-   ~/.config/git-policy exists. If either one already exists, stop, show me
-   what you found, and ask before going on. The installer would replace that
-   hooks path.
-
 1. git clone https://github.com/koryei/rules ~/.config/git-policy
 2. ~/.config/git-policy/install.sh
 3. rules
 
-Show me the output of step 3 and tell me what changed on this machine. If
-`rules` is not found, run ~/.local/bin/rules.
+Show me the output of steps 2 and 3 and tell me what changed on this
+machine. If `rules` is not found, run ~/.local/bin/rules.
+
+If the folder in step 1 already exists, or the installer says it left any
+git hooks alone, ask me before changing anything.
 
 Do not edit ~/AGENTS.md directly. If you want to change the rules, run
 `rules propose` and tell me a proposal is waiting for my review.
@@ -24,17 +22,15 @@ Do not edit ~/AGENTS.md directly. If you want to change the rules, run
 
 ## What the agent will do
 
-1. Check for a global git hooks path or an earlier install, and stop to ask if
-   it finds one. The installer would replace that hooks path.
-2. Clone the repo to `~/.config/git-policy`.
-3. Run the installer, which:
+1. Clone the repo to `~/.config/git-policy`.
+2. Run the installer, which:
    - links `rules` onto your `PATH` at `~/.local/bin/rules`
    - creates `~/AGENTS.md` if it does not exist
    - symlinks that file into every agent config it finds
    - installs the git hook dispatcher and sets `core.hooksPath`, unless you
      already have a hooks path or hooks of your own, which it leaves alone and
      reports
-4. Print the dashboard.
+3. Print the dashboard.
 
 Nothing is pushed anywhere. Nothing leaves your machine.
 
