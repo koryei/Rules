@@ -27,11 +27,19 @@ new_home() {
   cp -R "$REPO/bin" "$REPO/hooks" "$REPO/install.sh" "$H/.config/git-policy/"
 }
 
+# A fresh HOME holding the checkout somewhere else entirely.
+new_home_elsewhere() {
+  H="$ROOT/$1"
+  mkdir -p "$H/src/rules" "$H/.git-hooks"
+  cp -R "$REPO/bin" "$REPO/hooks" "$REPO/install.sh" "$H/src/rules/"
+}
+
 in_home() {
   env -i HOME="$H" PATH="$H/.local/bin:$PATH" TERM=dumb GIT_CONFIG_NOSYSTEM=1 "$@" </dev/null
 }
 
-install_here() { OUT="$(in_home "$H/.config/git-policy/install.sh" 2>&1)"; STATUS=$?; }
+install_from() { OUT="$(in_home "$1" 2>&1)"; STATUS=$?; }
+install_here() { install_from "$H/.config/git-policy/install.sh"; }
 hooks_path()   { in_home git config --global --get core.hooksPath || echo unset; }
 said()         { case "$OUT" in *"$1"*) echo yes ;; *) echo no ;; esac; }
 check_status() { in_home rules check >/dev/null 2>&1; echo $?; }
@@ -87,6 +95,40 @@ printf '#!/bin/sh\nexit 0\n' > "$H/.git-hooks/_dispatch"
 install_here
 t "unrelated dispatcher survives" "exit 0" "$(sed -n 2p "$H/.git-hooks/_dispatch")"
 t "unrelated dispatcher is not switched on" unset "$(hooks_path)"
+
+# A clone outside ~/.config/git-policy: the dispatcher has to find the policy
+# hooks from wherever the repo actually lives.
+new_home_elsewhere relocated
+install_from "$H/src/rules/install.sh"
+t "install from another path succeeds" 0 "$STATUS"
+t "install from another path records the hooks directory" "$H/src/rules/hooks" "$(cat "$H/.git-hooks/_policy")"
+t "install from another path activates the hooks" "3/3 active" "$(active)"
+
+# Active is a claim; this is the proof. A commit on main must be refused.
+commit_on_main() {
+  in_home sh -c 'T=$(mktemp -d); cd "$T" || exit 9
+    git init -q -b main
+    git config user.email t@e.com; git config user.name T
+    echo a > a; git add a; git commit -qm "chore: init" >/dev/null 2>&1
+    echo b >> a; git add a; git commit -qm "feat: second" >/dev/null 2>&1
+    echo $?'
+}
+t "hooks fire from another install path" 1 "$(commit_on_main)"
+
+# A pointer that no longer resolves must not read as healthy.
+new_home stale
+install_here
+printf '%s\n' "$H/nowhere" > "$H/.git-hooks/_policy"
+t "a stale policy path is reported inactive" "0/3 active" "$(active)"
+t "a stale policy path fails the health check" 1 "$(check_status)"
+
+# A dispatcher from before _policy cannot be repointed, so it is replaced.
+new_home oldstyle
+printf '#!/bin/sh\npolicy="$HOME/.config/git-policy/hooks/$name"\n' > "$H/.git-hooks/_dispatch"
+chmod +x "$H/.git-hooks/_dispatch"
+install_here
+t "an old dispatcher is replaced" yes "$(said 'replaced the old dispatcher')"
+t "an old dispatcher is replaced with one that works" "3/3 active" "$(active)"
 
 rm -rf "$ROOT"
 printf '\n  %d passed' "$pass"
