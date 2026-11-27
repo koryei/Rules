@@ -874,6 +874,65 @@ html:not(.js) .card-foot .button {
   }
 }
 
+/* Laptop-height screens: draw the same page closer together. */
+@media (min-width: 1021px) and (max-height: 960px) {
+  .scene {
+    height: clamp(612px, calc(100svh - 272px), 780px);
+  }
+
+  .top {
+    padding-block: 8px;
+  }
+
+  .hero {
+    padding-top: 0;
+  }
+
+  h1 {
+    font-size: 3rem;
+  }
+
+  .lead {
+    max-width: 72em;
+    margin-top: 4px;
+    font-size: 17px;
+  }
+
+  .actions {
+    margin-top: 12px;
+  }
+
+  .actions .button {
+    min-height: 44px;
+  }
+
+  .stage {
+    padding-top: 12px;
+  }
+
+  /* Narrow enough to leave the keeper's window clear. */
+  .console {
+    width: 580px;
+  }
+
+  .console .panel {
+    padding: 12px 20px 8px;
+  }
+
+  .console pre {
+    line-height: 1.4;
+  }
+
+  .changes li {
+    padding-bottom: 2px;
+    line-height: 1.35;
+  }
+
+  .card-foot {
+    padding-block: 8px;
+  }
+}
+
 /* Below this width the card would sit on the lock, so it moves under the painting. */
 @media (max-width: 1020px) {
   .scene {
