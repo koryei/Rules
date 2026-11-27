@@ -440,6 +440,10 @@ h1 {
   outline-offset: -2px;
 }
 
+.narrow {
+  display: none;
+}
+
 /* Grows with its content, then stops at the space left and scrolls inside. */
 .card {
   align-self: start;
@@ -755,6 +759,15 @@ html:not(.js) .card-foot .button {
   .tabs button {
     padding-inline: 6px;
     letter-spacing: -0.01em;
+  }
+
+  /* Three full labels do not fit on one line at this width. */
+  .wide {
+    display: none;
+  }
+
+  .narrow {
+    display: inline;
   }
 }
 
