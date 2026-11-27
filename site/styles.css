@@ -858,6 +858,22 @@ html:not(.js) .card-foot .button {
   }
 }
 
+/* Side-by-side widths: the painting takes whatever height the first screen has
+   left, so the lock shows under the card without scrolling. */
+@media (min-width: 1021px) {
+  .scene {
+    height: clamp(540px, calc(100svh - 384px), 780px);
+  }
+
+  .console {
+    padding-top: 12px;
+  }
+
+  .card {
+    margin-top: 8px;
+  }
+}
+
 /* Below this width the card would sit on the lock, so it moves under the painting. */
 @media (max-width: 1020px) {
   .scene {
