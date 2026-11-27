@@ -72,7 +72,11 @@ warn(){ printf '  %s!%s %s\n' "$C_Y" "$C_RST" "$1"; }
 dim() { printf '  %s%s%s\n' "$C_D" "$1" "$C_RST"; }
 
 banner() {
-  printf '\n  %s%srules%s %s·%s %s%s\n' "$C_B" "$C_C" "$C_RST" "$C_D" "$C_RST" "$1" "$C_RST"
+  if [ -n "${1:-}" ]; then
+    printf '\n  %s%sAgent Rules%s %s·%s %s%s\n' "$C_B" "$C_C" "$C_RST" "$C_D" "$C_RST" "$1" "$C_RST"
+  else
+    printf '\n  %s%sAgent Rules%s\n' "$C_B" "$C_C" "$C_RST"
+  fi
   hr
 }
 
@@ -333,7 +337,7 @@ append_section() {
 
 # ------------------------------------------------------------ commands ------
 cmd_dashboard() {
-  banner "global agent rules"
+  banner ""
   printf '\n'
 
   if [ ! -f "$CANON" ]; then
