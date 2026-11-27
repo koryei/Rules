@@ -20,7 +20,15 @@ ok "linked $BIN_DIR/rules"
 
 case ":$PATH:" in
   *":$BIN_DIR:"*) ok "$BIN_DIR is on PATH" ;;
-  *) warn "$BIN_DIR is not on PATH - add it to your shell profile" ;;
+  *)
+    warn "$BIN_DIR is not on PATH"
+    say "  add this to your shell profile:"
+    case "${SHELL:-}" in
+      */fish) say "    fish_add_path $BIN_DIR" ;;
+      */zsh)  say "    echo 'export PATH=\"$BIN_DIR:\$PATH\"' >> ~/.zshrc" ;;
+      *)      say "    echo 'export PATH=\"$BIN_DIR:\$PATH\"' >> ~/.bashrc" ;;
+    esac
+    ;;
 esac
 
 # 2. rules file
