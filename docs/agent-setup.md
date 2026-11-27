@@ -1,7 +1,8 @@
 # Let an AI agent set up Agent Rules
 
-Copy the box below into any AI agent. It works with Claude Code, Codex, Cursor,
-Gemini CLI, Windsurf, opencode, or anything else that can run shell commands.
+Copy the box below into any AI agent that can run shell commands. Cursor can run
+the install too, but it is not one of the linked tools. See
+[Cursor](../README.md#cursor).
 
 ```
 Install the `rules` CLI on this machine.
