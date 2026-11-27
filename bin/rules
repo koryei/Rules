@@ -201,16 +201,32 @@ verdict() {
   elif [ "$bad" -gt 0 ]; then
     if [ "$bad" -eq 1 ]; then printf '%s1 tool link needs attention.%s' "$C_Y" "$C_RST"
     else printf '%s%d tool links need attention.%s' "$C_Y" "$bad" "$C_RST"; fi
+  elif [ "$(hooks_active)" -lt 3 ]; then
+    printf '%sGit is not running all three hooks.%s' "$C_Y" "$C_RST"
   else
     printf '%s✓ Everything is in order.%s' "$C_G" "$C_RST"
   fi
 }
 
-hook_summary() {
+# A policy hook is active only if git will run it: the global hooks path has to
+# hold a hook of that name which calls the policy hooks.
+hook_active() {
+  local dir
+  dir=$(git config --global --path --get core.hooksPath 2>/dev/null)
+  [ -x "$HOOKDIR/$1" ] && [ -n "$dir" ] && [ -x "$dir/$1" ] \
+    && grep -q 'git-policy/hooks' "$dir/$1" 2>/dev/null
+}
+
+hooks_active() {
   local n=0 h
-  for h in pre-commit commit-msg pre-push; do [ -x "$HOOKDIR/$h" ] && n=$((n+1)); done
+  for h in pre-commit commit-msg pre-push; do hook_active "$h" && n=$((n+1)); done
+  printf '%s' "$n"
+}
+
+hook_summary() {
+  local n; n=$(hooks_active)
   if [ "$n" -eq 3 ]; then printf '%s3 active%s' "$C_G" "$C_RST"
-  else printf '%s%d/3 active%s' "$C_Y" "$n" "$C_RST"; fi
+  else printf '%s%d/3 active%s · run: rules hooks' "$C_Y" "$n" "$C_RST"; fi
 }
 
 
@@ -421,7 +437,7 @@ cmd_check() {
     return 1
   fi
 
-  local problems=0 cur appr bad_links total hn h f
+  local problems=0 cur appr bad_links total hn f
   cur=$(hash_of "$CANON"); appr=$(cat "$APPROVED" 2>/dev/null || echo "")
   total=$(link_total); bad_links=$(link_problems)
 
@@ -445,12 +461,11 @@ cmd_check() {
     problems=$((problems+1))
   fi
 
-  hn=0
-  for h in pre-commit commit-msg pre-push; do [ -x "$HOOKDIR/$h" ] && hn=$((hn+1)); done
+  hn=$(hooks_active)
   if [ "$hn" -eq 3 ]; then
-    printf '   %s%-12s%s %s\n' "$C_D" "hooks" "$C_RST" "${C_G}✓${C_RST} 3/3 executable"
+    printf '   %s%-12s%s %s\n' "$C_D" "hooks" "$C_RST" "${C_G}✓${C_RST} 3/3 active"
   else
-    printf '   %s%-12s%s %s\n' "$C_D" "hooks" "$C_RST" "${C_R}✗${C_RST} $hn/3 executable"
+    printf '   %s%-12s%s %s\n' "$C_D" "hooks" "$C_RST" "${C_R}✗${C_RST} $hn/3 active · run: rules hooks"
     problems=$((problems+1))
   fi
   printf '  %s%s%s\n\n' "$C_D" "$(rep '─' $((W-4)))" "$C_RST"
@@ -508,9 +523,13 @@ cmd_hooks() {
   printf '\n'
   local h
   for h in pre-commit commit-msg pre-push; do
-    if [ -x "$HOOKDIR/$h" ]; then ok "$h"
-    else bad "$h"; fi
+    if hook_active "$h"; then ok "$h"
+    else bad "$h · git is not running it"; fi
   done
+  if [ "$(hooks_active)" -lt 3 ]; then
+    printf '\n  %sThe global hooks path must hold hooks that call the policy hooks.%s\n' "$C_D" "$C_RST"
+    printf '  %sSee docs/how-it-works.md, or run the installer to see what is in the way.%s\n' "$C_D" "$C_RST"
+  fi
   printf '\n'
   row "DISPATCH" "$HOME/.git-hooks/_dispatch"
   row "HOOKSPATH" "$(git config --global core.hooksPath 2>/dev/null || echo 'unset')"
