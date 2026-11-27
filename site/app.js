@@ -14,7 +14,7 @@ const store = {
 const scene = (() => {
   const canvas = $('#lock');
   const ctx = canvas?.getContext('2d');
-  if (!ctx) return { open() {}, pick() {} };
+  if (!ctx) return { open() {} };
 
   const backdrop = paintBackdrop();
   const image = ctx.createImageData(W, H);
@@ -72,10 +72,6 @@ const scene = (() => {
         tween('open', state.open, 0, 1300, (v) => { state.open = v; });
         tween('window', state.window, 0, 1300, (v) => { state.window = v; });
       }, 5200);
-    },
-    pick(i) {
-      state.picked = i;
-      draw();
     },
   };
 })();
@@ -149,7 +145,6 @@ async function copyPrompt(button) {
   if (!ok) {
     $('#tab-prompt').click();
     say(button, 'Couldn’t reach the clipboard. The prompt is selected, so press ⌘C or Ctrl+C');
-    $('#prompt').scrollIntoView({ block: 'start' });
     source.focus({ preventScroll: true });
     getSelection().selectAllChildren(source);
     return;
@@ -194,34 +189,5 @@ addEventListener('keydown', (e) => {
   if (e.metaKey || e.ctrlKey || e.altKey || e.shiftKey || e.repeat) return;
   if (e.target.closest?.('input:not([type="checkbox"]), textarea, select, [contenteditable]')) return;
   e.preventDefault();
-  const hero = $('#hero-copy');
-  const visible = hero.getBoundingClientRect().bottom > 0;
-  copyPrompt(visible ? hero : $('.top-copy'));
+  copyPrompt($('#hero-copy'));
 });
-
-// --------------------------------------------------------------------- fleet --
-const reads = $('[data-reads]');
-const idleReads = reads.innerHTML;
-const tools = $$('[data-boat]');
-
-for (const tool of tools) {
-  tool.addEventListener('click', () => {
-    const on = tool.getAttribute('aria-pressed') !== 'true';
-    tools.forEach((t) => t.setAttribute('aria-pressed', String(on && t === tool)));
-    scene.pick(on ? Number(tool.dataset.boat) : -1);
-    if (!on) {
-      reads.innerHTML = idleReads;
-      return;
-    }
-    const code = document.createElement('code');
-    code.textContent = tool.dataset.path;
-    const name = tool.textContent.trim();
-    if (tool.dataset.how === 'imports') reads.replaceChildren(`${name} reads your file through one import line in `, code);
-    else reads.replaceChildren(`${name} reads `, code, ', which links to your file');
-  });
-}
-
-// -------------------------------------------------------------------- header --
-new IntersectionObserver(([entry]) => {
-  $('.top').classList.toggle('is-scrolled', !entry.isIntersecting && entry.boundingClientRect.top < 100);
-}, { rootMargin: '-76px 0px 0px 0px' }).observe($('#hero-copy'));
