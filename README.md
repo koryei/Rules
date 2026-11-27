@@ -86,17 +86,15 @@ Gemini, whatever you use.
 ```
 Install the `rules` CLI on this machine.
 
-0. Run `git config --global core.hooksPath` and check whether
-   ~/.config/git-policy exists. If either one already exists, stop, show me
-   what you found, and ask before going on. The installer would replace that
-   hooks path.
-
 1. git clone https://github.com/koryei/rules ~/.config/git-policy
 2. ~/.config/git-policy/install.sh
 3. rules
 
-Show me the output of step 3 and tell me what changed on this machine. If
-`rules` is not found, run ~/.local/bin/rules.
+Show me the output of steps 2 and 3 and tell me what changed on this
+machine. If `rules` is not found, run ~/.local/bin/rules.
+
+If the folder in step 1 already exists, or the installer says it left any
+git hooks alone, ask me before changing anything.
 
 Do not edit ~/AGENTS.md directly. If you want to change the rules, run
 `rules propose` and tell me a proposal is waiting for my review.
