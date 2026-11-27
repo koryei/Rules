@@ -1,0 +1,63 @@
+#!/bin/sh
+# Global commit-msg policy: Conventional Commits, enforced.
+set -u
+
+msgfile="${1:-}"
+[ -f "$msgfile" ] || exit 0
+
+RED=$(printf '\033[31m'); DIM=$(printf '\033[2m'); RST=$(printf '\033[0m')
+
+fail() {
+  printf '\n%sx git-policy:%s %s\n' "$RED" "$RST" "$1" >&2
+  _log="$HOME/.config/git-policy/state/blocks.log"
+  mkdir -p "$(dirname "$_log")" 2>/dev/null
+  printf '%s\t%s\t%s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "$(basename "$0")" "$1" >> "$_log" 2>/dev/null
+}
+note() { printf '%s  %s%s\n' "$DIM" "$1" "$RST" >&2; }
+
+# First non-comment, non-blank line is the subject.
+subject=$(grep -v '^#' "$msgfile" | sed '/^[[:space:]]*$/d' | head -1)
+
+if [ -z "$subject" ]; then
+  fail "empty commit message."
+  note "format: <type>(<scope>): <subject>"
+  exit 1
+fi
+
+# Git-generated and rebase messages are exempt.
+case "$subject" in
+  "Merge "*|"Revert "*|"fixup! "*|"squash! "*|"amend! "*|"Initial commit"*) exit 0 ;;
+esac
+
+if ! printf '%s' "$subject" | grep -Eq \
+  '^(feat|fix|chore|docs|refactor|test|perf|build|ci|revert)(\([a-z0-9._/-]+\))?!?: .+'; then
+  fail "commit subject is not a Conventional Commit:"
+  note "  got: $subject"
+  note "  want: <type>(<scope>): <subject>"
+  note "  types: feat fix chore docs refactor test perf build ci revert"
+  note "  e.g.:  feat(auth): add refresh token rotation"
+  exit 1
+fi
+
+len=$(printf '%s' "$subject" | wc -c | tr -d ' ')
+if [ "$len" -gt 72 ]; then
+  fail "commit subject is $len chars, limit is 72."
+  note "  $subject"
+  note "move detail into the body"
+  exit 1
+fi
+
+case "$subject" in
+  *.) fail "commit subject ends with a period."; exit 1 ;;
+esac
+
+# Reject content-free subjects.
+desc=$(printf '%s' "$subject" | sed -E 's/^[a-z]+(\([^)]*\))?!?:[[:space:]]*//')
+case "$(printf '%s' "$desc" | tr '[:upper:]' '[:lower:]')" in
+  wip|fix|fixes|fixed|update|updates|updated|change|changes|changed|stuff|things|test|tmp|temp|final|final2|more|misc|asdf|.|..|...|x)
+    fail "commit subject is not descriptive: '$desc'"
+    note "say what changed:  feat(api): return 404 for missing user"
+    exit 1 ;;
+esac
+
+exit 0
