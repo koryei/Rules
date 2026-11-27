@@ -82,13 +82,13 @@
                 <div class="panel" role="tabpanel" id="panel-prompt" aria-labelledby="tab-prompt">
 <pre id="prompt-text" tabindex="-1">Install the `rules` CLI on this machine.
 
-0. Run `git config --global core.hooksPath` and check whether ~/.config/git-policy exists. If either one already exists, stop, show me what you found, and ask before going on. The installer would replace that hooks path.
-
 1. git clone https://github.com/koryei/rules ~/.config/git-policy
 2. ~/.config/git-policy/install.sh
 3. rules
 
-Show me the output of step 3 and tell me what changed on this machine. If `rules` is not found, run ~/.local/bin/rules.
+Show me the output of steps 2 and 3 and tell me what changed on this machine. If `rules` is not found, run ~/.local/bin/rules.
+
+If the folder in step 1 already exists, or the installer says it left any git hooks alone, ask me before changing anything.
 
 Do not edit ~/AGENTS.md directly. If you want to change the rules, run `rules propose` and tell me a proposal is waiting for my review.</pre>
                 </div>
@@ -100,18 +100,17 @@ Do not edit ~/AGENTS.md directly. If you want to change the rules, run `rules pr
                     <li>Creates a starter <code>~/AGENTS.md</code>, or keeps the one you have</li>
                     <li>Links 8 tool configs to that file and adds one import line to <code>~/.claude/CLAUDE.md</code></li>
                     <li>Leaves config files you wrote untouched. A config that is already a link to another file is pointed at yours</li>
-                    <li>Sets git’s global hooks path to <code>~/.git-hooks</code> so checks run on commits and pushes</li>
+                    <li>Sets git’s global hooks path to <code>~/.git-hooks</code>. A path or hook you already have is left alone, and the installer says so</li>
                     <li>Uploads nothing from your machine</li>
                   </ul>
                 </div>
 
                 <div class="panel" role="tabpanel" id="panel-hand" aria-labelledby="tab-hand">
-                  <p>No agent? Run the same install yourself. First check that this prints nothing, because the installer replaces the path it reports</p>
-<pre>git config --global core.hooksPath</pre>
-                  <p>Then install and open the dashboard</p>
+                  <p>No agent? Run the same install yourself</p>
 <pre>git clone https://github.com/koryei/rules ~/.config/git-policy
 ~/.config/git-policy/install.sh
 rules</pre>
+                  <p>If you already use git hooks, the installer keeps them and tells you how to add these</p>
                 </div>
               </div>
 
