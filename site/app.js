@@ -76,6 +76,18 @@ const scene = (() => {
   };
 })();
 
+// ------------------------------------------------------------------- scroll --
+// The card is capped to the screen, so say when there is more below.
+const panels = $('.panels');
+const syncScroll = () => {
+  const left = panels.scrollHeight - panels.clientHeight - panels.scrollTop;
+  panels.toggleAttribute('data-more', left > 2);
+};
+panels.addEventListener('scroll', syncScroll, { passive: true });
+addEventListener('resize', syncScroll);
+document.fonts?.ready.then(syncScroll);
+syncScroll();
+
 // ---------------------------------------------------------------------- tabs --
 for (const list of $$('[data-tabs]')) {
   const tabs = $$('[role="tab"]', list);
@@ -88,6 +100,8 @@ for (const list of $$('[data-tabs]')) {
       panel.toggleAttribute('data-hidden', !on);
       panel.inert = !on;
     }
+    panels.scrollTop = 0;
+    syncScroll();
     if (focus) tab.focus();
   };
   list.addEventListener('click', (e) => {
