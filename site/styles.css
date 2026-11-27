@@ -478,6 +478,12 @@ h1 {
   background: var(--raised-hover);
 }
 
+/* Fades the last line while there is more to read below. */
+.panels[data-more] {
+  -webkit-mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+  mask-image: linear-gradient(to bottom, #000 calc(100% - 24px), transparent);
+}
+
 .panel {
   grid-area: 1 / 1;
   min-width: 0;
