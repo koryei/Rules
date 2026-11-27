@@ -7,7 +7,12 @@
 # (counters, notifications) above the policy call.
 name=$(basename "$0")
 
-policy="$HOME/.config/git-policy/hooks/$name"
+# The installer records where the policy hooks live in _policy, so the repo
+# can be cloned anywhere. Without that file, fall back to the documented path.
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+policy_dir=$(cat "$here/_policy" 2>/dev/null)
+[ -n "$policy_dir" ] || policy_dir="$HOME/.config/git-policy/hooks"
+policy="$policy_dir/$name"
 if [ -x "$policy" ]; then
   "$policy" "$@" || exit $?
 fi
