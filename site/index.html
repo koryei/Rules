@@ -1,0 +1,285 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Agent Rules: one rules file for every coding agent</title>
+  <meta name="description" content="Paste one prompt into your coding agent and it installs Agent Rules: one rules file that nine AI tools read. Agents propose changes, you apply them.">
+  <meta name="theme-color" content="#090b10">
+  <meta name="color-scheme" content="dark">
+  <link rel="canonical" href="https://koryei.github.io/rules/">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="One rules file for every coding agent">
+  <meta property="og:description" content="Paste one prompt and your agent installs it. Agents propose rule changes, you apply them.">
+  <meta property="og:url" content="https://koryei.github.io/rules/">
+  <meta property="og:image" content="https://koryei.github.io/rules/art/share.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:image:alt" content="Pixel art of boats waiting at a closed canal lock at night, beside a cottage with one lit window">
+  <meta name="twitter:card" content="summary_large_image">
+  <link rel="icon" href="art/icon.svg" type="image/svg+xml">
+  <link rel="preload" href="fonts/geist.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="fonts/geist-mono.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="styles.css">
+  <script type="module" src="app.js"></script>
+</head>
+<body>
+  <a class="skip" href="#prompt">Skip to the setup prompt</a>
+
+  <header class="top">
+    <div class="wrap top-row">
+      <a class="mark" href="./">
+        <svg viewBox="0 0 12 12" width="24" height="24" aria-hidden="true" shape-rendering="crispEdges">
+          <path fill="#c3cadc" d="M0 2h2v10H0zM10 2h2v10h-2z"/>
+          <path fill="#ff8a3d" d="M2 5h1V4h2V3h2v1h2v1h1v7H7V6H5v6H2z"/>
+        </svg>
+        Agent Rules
+      </a>
+      <nav aria-label="Page">
+        <a href="#approval">Approval</a>
+        <a href="#blocked">Blocked commits</a>
+        <a href="#limits">Limits</a>
+        <a href="https://github.com/koryei/rules">GitHub</a>
+      </nav>
+      <a class="button button-small top-copy" href="#prompt" data-copy>
+        <span class="swap"><span>Copy prompt</span><span aria-hidden="true">Copied</span></span>
+      </a>
+    </div>
+  </header>
+
+  <main>
+    <section class="hero framed">
+      <div class="wrap">
+        <h1>One rules file for every coding agent</h1>
+        <p class="lead">Paste one prompt and your agent installs Agent Rules. From then on, agents can propose changes and only you can apply them</p>
+        <div class="actions">
+          <a class="button" href="#prompt" id="hero-copy" data-copy aria-keyshortcuts="c">
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5h8v8h-8zM2.5 10.5v-8h8"/></svg>
+            <span class="swap"><span>Copy setup prompt</span><span aria-hidden="true">Copied</span></span>
+            <kbd aria-hidden="true">C</kbd>
+          </a>
+          <p class="status" role="status" data-status>Free and MIT licensed. Needs macOS or Linux, bash and git</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="stage framed" aria-label="Setup prompt">
+      <div class="wrap">
+        <div class="scene">
+          <div class="art">
+            <canvas id="lock" width="640" height="360" role="img" aria-label="Pixel art of a canal lock at night. Nine boats wait at the closed gates beside a cottage with one lit window"></canvas>
+          </div>
+
+          <div class="console" id="prompt">
+            <div class="tabs" role="tablist" aria-label="Setup" data-tabs>
+              <button type="button" role="tab" id="tab-prompt" aria-controls="panel-prompt" aria-selected="true">Setup prompt</button>
+              <button type="button" role="tab" id="tab-changes" aria-controls="panel-changes" aria-selected="false" tabindex="-1">What it changes</button>
+              <button type="button" role="tab" id="tab-hand" aria-controls="panel-hand" aria-selected="false" tabindex="-1">By hand</button>
+            </div>
+
+            <div class="card">
+              <div class="panels">
+                <div class="panel" role="tabpanel" id="panel-prompt" aria-labelledby="tab-prompt">
+<pre id="prompt-text" tabindex="-1">Install the `rules` CLI on this machine.
+
+0. Run `git config --global core.hooksPath` and check whether ~/.config/git-policy exists. If either one already exists, stop, show me what you found, and ask before going on. The installer would replace that hooks path.
+
+1. git clone https://github.com/koryei/rules ~/.config/git-policy
+2. ~/.config/git-policy/install.sh
+3. rules
+
+Show me the output of step 3 and tell me what changed on this machine. If `rules` is not found, run ~/.local/bin/rules.
+
+Do not edit ~/AGENTS.md directly. If you want to change the rules, run `rules propose` and tell me a proposal is waiting for my review.</pre>
+                </div>
+
+                <div class="panel" role="tabpanel" id="panel-changes" aria-labelledby="tab-changes">
+                  <ul class="changes">
+                    <li>Clones Agent Rules into <code>~/.config/git-policy</code></li>
+                    <li>Adds the <code>rules</code> command at <code>~/.local/bin/rules</code></li>
+                    <li>Creates a starter <code>~/AGENTS.md</code>, or keeps the one you have</li>
+                    <li>Links 8 tool configs to that file and adds one import line to <code>~/.claude/CLAUDE.md</code></li>
+                    <li>Leaves config files you wrote untouched. A config that is already a link to another file is pointed at yours</li>
+                    <li>Sets git’s global hooks path to <code>~/.git-hooks</code> so checks run on commits and pushes</li>
+                    <li>Uploads nothing from your machine</li>
+                  </ul>
+                </div>
+
+                <div class="panel" role="tabpanel" id="panel-hand" aria-labelledby="tab-hand">
+                  <p>No agent? Run the same install yourself. First check that this prints nothing, because the installer replaces the path it reports</p>
+<pre>git config --global core.hooksPath</pre>
+                  <p>Then install and open the dashboard</p>
+<pre>git clone https://github.com/koryei/rules ~/.config/git-policy
+~/.config/git-policy/install.sh
+rules</pre>
+                </div>
+              </div>
+
+              <div class="card-foot">
+                <p>Paste into any agent that can run shell commands</p>
+                <button type="button" class="button button-small" data-copy>
+                  <span class="swap"><span>Copy</span><span aria-hidden="true">Copied</span></span>
+                  <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5h8v8h-8zM2.5 10.5v-8h8"/></svg>
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="fleet">
+          <h2>Nine boats, nine tools, one file</h2>
+          <ul>
+            <li><button type="button" aria-pressed="false" data-boat="0" data-path="~/.claude/CLAUDE.md" data-how="imports">Claude Code</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="1" data-path="~/.codex/AGENTS.md">Codex</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="2" data-path="~/.gemini/GEMINI.md">Gemini CLI</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="3" data-path="~/.codeium/windsurf/memories/global_rules.md">Windsurf</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="4" data-path="~/.config/opencode/AGENTS.md">opencode</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="5" data-path="~/.config/crush/CRUSH.md">crush</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="6" data-path="~/.config/goose/.goosehints">goose</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="7" data-path="~/.continue/rules/global.md">Continue</button></li>
+            <li><button type="button" aria-pressed="false" data-boat="8" data-path="~/.vibe/AGENTS.md">Mistral Vibe</button></li>
+          </ul>
+          <p class="reads" aria-live="polite" data-reads>Pick a tool to find its boat. A project’s own <code>AGENTS.md</code> or <code>CLAUDE.md</code> still wins inside that project</p>
+        </div>
+      </div>
+    </section>
+
+    <section class="approval framed" id="approval">
+      <div class="wrap split">
+        <div class="say">
+          <h2>Agents propose. You approve.</h2>
+          <p><code>rules edit</code>, <code>rules review</code> and <code>rules approve</code> refuse to run when they detect an agent. The agent writes a proposal instead, and your rules stay as they are until you accept it</p>
+        </div>
+
+        <div class="term">
+          <div class="tabs" role="tablist" aria-label="How a rule change happens" data-tabs>
+            <button type="button" role="tab" id="tab-refused" aria-controls="panel-refused" aria-selected="true">Agent edits</button>
+            <button type="button" role="tab" id="tab-propose" aria-controls="panel-propose" aria-selected="false" tabindex="-1">Agent proposes</button>
+            <button type="button" role="tab" id="tab-review" aria-controls="panel-review" aria-selected="false" tabindex="-1">You review</button>
+          </div>
+          <div class="panels">
+            <div class="panel" role="tabpanel" id="panel-refused" aria-labelledby="tab-refused">
+<pre><b>$ rules edit</b>
+
+<span class="box">HUMAN APPROVAL REQUIRED</span>
+This looks like an AI agent (CLAUDECODE).
+Editing the global rules is a human-only action. It is not
+available to you, and no flag or env var unlocks it.
+
+What to do instead:
+  1. Write the change you want as a proposal:
+       rules propose --section "&lt;name&gt;" &lt; new-content.txt
+  2. Tell the human a proposal is waiting.
+  3. Stop. Do not edit ~/AGENTS.md directly.</pre>
+            </div>
+            <div class="panel" role="tabpanel" id="panel-propose" aria-labelledby="tab-propose">
+<pre><b>$ echo "- Run the tests before every commit." |
+    rules propose --section "Testing"</b>
+
+<span class="yes">✓</span> proposal written
+FILE       ~/.config/git-policy/proposals/20261127T011301Z-testing.proposal
+KIND       section · Testing
+
+<span class="wait">This did not change the rules.</span>
+A human must run rules review to accept or reject it.</pre>
+            </div>
+            <div class="panel" role="tabpanel" id="panel-review" aria-labelledby="tab-review">
+<pre><b>$ rules review</b>
+
+Agent Rules · review
+<span class="divider"></span> section     Testing
+ from        CLAUDECODE
+ when        2026-11-27T01:13:01Z
+
+Changes
+@@ -0,0 +1 @@
+<span class="yes">+- Run the tests before every commit.</span>
+
+  a   accept
+  r   reject
+  s   skip
+  q   quit
+
+What do you want to do?</pre>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <section class="blocked framed" id="blocked">
+      <div class="wrap">
+        <h2>Bad commits stop at your machine</h2>
+        <p class="intro">Three global git hooks run on every commit and push, whichever agent typed the command</p>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th scope="col">What the agent tries</th><th scope="col">What git answers</th><th scope="col">Hook</th></tr>
+            </thead>
+            <tbody>
+              <tr><th scope="row">Commit on <code>main</code></th><td>refusing to commit directly to protected branch 'main'</td><td>pre-commit</td></tr>
+              <tr><th scope="row">Stage <code>.env</code> or a private key</th><td>staged files look like secrets</td><td>pre-commit</td></tr>
+              <tr><th scope="row">Paste an API key into code</th><td>staged diff contains what looks like a credential</td><td>pre-commit</td></tr>
+              <tr><th scope="row">Add a file over 5MB</th><td>staged files exceed 5MB</td><td>pre-commit</td></tr>
+              <tr><th scope="row">Commit with the message <code>wip</code></th><td>commit subject is not a Conventional Commit</td><td>commit-msg</td></tr>
+              <tr><th scope="row">Write a 90-character subject</th><td>commit subject is 90 chars, limit is 72</td><td>commit-msg</td></tr>
+              <tr><th scope="row">Push straight to <code>main</code></th><td>refusing to push directly to protected branch 'main'</td><td>pre-push</td></tr>
+              <tr><th scope="row">Force-push <code>main</code></th><td>refusing to force-push protected branch 'main'</td><td>pre-push</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <p class="after">Protected branches are <code>main</code>, <code>master</code>, <code>develop</code> and <code>release/*</code>. A new repository’s first commit is allowed</p>
+      </div>
+    </section>
+
+    <section class="limits framed" id="limits">
+      <div class="wrap split">
+        <div class="say">
+          <h2>What it can’t stop</h2>
+          <p>Everything here runs as your user, so treat it as a strong guard and not a wall</p>
+        </div>
+        <dl>
+          <div>
+            <dt>An agent writing to the file directly</dt>
+            <dd>A shell command can still change <code>~/AGENTS.md</code>. <code>rules check</code> compares the file with your last approval and reports “changed outside the CLI”</dd>
+          </div>
+          <div>
+            <dt>An agent skipping the hooks</dt>
+            <dd><code>--no-verify</code> skips the commit and push checks, and several block messages print a one-off override</dd>
+          </div>
+          <div>
+            <dt>The fix for both</dt>
+            <dd>Add branch rules on GitHub, where nothing on your machine can skip them. The included script previews them with <code>./scripts/apply-github-ruleset.sh --dry-run --all</code>. Private repositories need a paid GitHub plan</dd>
+          </div>
+        </dl>
+      </div>
+    </section>
+
+    <section class="close framed">
+      <div class="wrap">
+        <h2>Hand your agent the prompt</h2>
+        <p class="lead">It installs the app, then reports what changed on your machine</p>
+        <div class="actions">
+          <a class="button" href="#prompt" data-copy>
+            <svg class="icon" viewBox="0 0 16 16" aria-hidden="true"><path d="M5.5 5.5h8v8h-8zM2.5 10.5v-8h8"/></svg>
+            <span class="swap"><span>Copy setup prompt</span><span aria-hidden="true">Copied</span></span>
+          </a>
+          <p class="status" data-status>Takes three commands</p>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="foot framed">
+    <div class="wrap foot-row">
+      <p>Agent Rules is free under the MIT license</p>
+      <ul>
+        <li><a href="https://github.com/koryei/rules">Source</a></li>
+        <li><a href="https://github.com/koryei/rules/blob/main/docs/commands.md">Commands</a></li>
+        <li><a href="https://github.com/koryei/rules/blob/main/docs/how-it-works.md">How it works</a></li>
+      </ul>
+      <label class="shortcut"><input type="checkbox" id="shortcut" checked> Press C to copy the prompt</label>
+    </div>
+  </footer>
+</body>
+</html>
