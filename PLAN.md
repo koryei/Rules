@@ -15,7 +15,7 @@ Goal: the visitor copies the setup prompt and their agent installs Agent Rules.
 
 - [x] Page, painting, copy behaviour
 - [x] Prompt synced into README and setup guide
-- [ ] Merged and live
+- [x] Merged (PR #1) and live at https://koryei.github.io/Rules/
 
 ## Open items
 
