@@ -62,8 +62,9 @@ git clone https://github.com/koryei/rules ~/.config/git-policy
 ~/.config/git-policy/install.sh
 ```
 
-The installer puts `rules` on your `PATH`, creates `~/AGENTS.md` if you do not
-have one, and links it into every agent config it finds.
+The installer links `rules` into `~/.local/bin` (usually already on your
+`PATH`), creates `~/AGENTS.md` if you do not have one, and links it into every
+agent config it finds.
 
 ## Use
 
