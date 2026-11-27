@@ -66,6 +66,10 @@ The installer links `rules` into `~/.local/bin` (usually already on your
 `PATH`), creates `~/AGENTS.md` if you do not have one, and links it into every
 agent config it finds.
 
+It never replaces your git setup. If git already has a global hooks path, or
+`~/.git-hooks` holds hooks or a dispatcher of yours, the installer leaves them
+alone and tells you which hooks are inactive. `rules hooks` shows the same.
+
 ## Use
 
 ```sh
@@ -195,6 +199,7 @@ hooks/commit-msg
 hooks/pre-push
 scripts/apply-github-ruleset.sh   GitHub-side enforcement
 test/run.sh                  hook test suite
+test/install.sh              installer tests
 examples/AGENTS.md           a starter rules file
 docs/                        longer explanations
 ```
