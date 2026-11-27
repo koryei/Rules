@@ -16,14 +16,14 @@ Goal: the visitor copies the setup prompt and their agent installs Agent Rules.
 - [x] Page, painting, copy behaviour
 - [x] Prompt synced into README and setup guide
 - [x] Merged (PR #1) and live at https://koryei.github.io/Rules/
-
-## Open items, in review
-
-- [ ] PR #3: installer keeps existing git hooks; prompt and docs updated
-- [ ] PR #4: docs say Cursor is not linked
-- [ ] PR #5: lock visible on laptop screens (merge after #3)
+- [x] Installer keeps existing git hooks; prompt and docs updated (PR #3)
+- [x] Docs say Cursor is not linked (PR #4)
+- [x] Lock visible on laptop screens (PR #5)
+- [x] Site cut to one screen: hero and prompt card only, painting behind
 
 ## Decisions on open items
 
 - Cursor is documented, not linked: its global rules live in app settings. A
   local Cursor plugin could be added later if wanted.
+- The page is one screen with no page scroll. The prompt card scrolls inside
+  itself when the prompt does not fit, which is the case on phones.
