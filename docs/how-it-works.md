@@ -45,14 +45,21 @@ one dispatcher:
 ```sh
 name=$(basename "$0")
 
-# 1. the policy hook
-policy="$HOME/.config/git-policy/hooks/$name"
+# 1. the policy hook, from wherever the repo was cloned
+here=$(cd "$(dirname "$0")" 2>/dev/null && pwd)
+policy_dir=$(cat "$here/_policy" 2>/dev/null)
+[ -n "$policy_dir" ] || policy_dir="$HOME/.config/git-policy/hooks"
+policy="$policy_dir/$name"
 [ -x "$policy" ] && { "$policy" "$@" || exit $?; }
 
 # 2. the repo's own hook, if it has one
 local="$(git rev-parse --git-common-dir)/hooks/$name"
 [ -x "$local" ] && exec "$local" "$@"
 ```
+
+The installer writes the repo's hooks directory into `~/.git-hooks/_policy`,
+so the repo can be cloned anywhere. Without that file the dispatcher falls back
+to `~/.config/git-policy`, which is where the README tells you to clone.
 
 Because this lives in git config rather than in any agent, it fires no matter
 which tool ran `git commit`. Claude, Codex, Cursor, a human in a terminal — all
