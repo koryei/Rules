@@ -43,14 +43,19 @@
 }
 
 html {
+  height: 100%;
   background: var(--ground);
-  scroll-behavior: smooth;
-  scroll-padding-top: 96px;
   -webkit-text-size-adjust: 100%;
 }
 
+/* One screen. The card scrolls inside itself rather than the page. */
 body {
+  height: 100vh;
+  height: 100svh;
   margin: 0;
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  overflow: hidden;
   color: var(--ink);
   font: 400 17px/1.55 var(--sans);
   -webkit-font-smoothing: antialiased;
@@ -58,11 +63,8 @@ body {
 }
 
 h1,
-h2,
 p,
 ul,
-dl,
-dd,
 pre {
   margin: 0;
 }
@@ -72,22 +74,9 @@ ul {
   list-style: none;
 }
 
-h1,
-h2 {
+h1 {
   font-weight: 550;
   text-wrap: balance;
-}
-
-h1 {
-  font-size: clamp(2.25rem, 4.6vw, 3.75rem);
-  line-height: 1.08;
-  letter-spacing: -0.032em;
-}
-
-h2 {
-  font-size: clamp(1.75rem, 3vw, 2.5rem);
-  line-height: 1.15;
-  letter-spacing: -0.025em;
 }
 
 p {
@@ -123,27 +112,58 @@ code {
 
 .wrap {
   position: relative;
+  width: 100%;
   max-width: 1280px;
   margin-inline: auto;
   padding-inline: var(--pad);
 }
 
-/* The broken vertical rules at the page edges. */
-.framed > .wrap::before,
-.framed > .wrap::after {
-  content: "";
-  position: absolute;
-  inset-block: 0;
-  width: 1px;
-  background: var(--line);
+/* --------------------------------------------------------------- painting -- */
+/* The painting is the page. It covers whatever shape the screen is. */
+.art {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  background: #0b1226 url("art/lock.png") 50% 100% / cover no-repeat;
+  image-rendering: pixelated;
 }
 
-.framed > .wrap::before {
-  left: 0;
+.art canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: 50% 100%;
+  image-rendering: pixelated;
 }
 
-.framed > .wrap::after {
-  right: 0;
+/* Keeps the headline readable over the sky without hiding the scene. */
+.veil {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: linear-gradient(
+    to bottom,
+    rgb(9 11 16 / 0.9) 0%,
+    rgb(9 11 16 / 0.66) 24%,
+    rgb(9 11 16 / 0.2) 48%,
+    rgb(9 11 16 / 0.06) 68%,
+    rgb(9 11 16 / 0.5) 100%
+  );
+}
+
+.top,
+main {
+  position: relative;
+  z-index: 2;
+}
+
+/* The hero keeps its height; the stage takes what is left and may shrink. */
+main {
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  min-height: 0;
 }
 
 .skip {
@@ -163,11 +183,7 @@ code {
 
 /* ------------------------------------------------------------------ header */
 .top {
-  position: sticky;
-  top: 0;
-  z-index: 10;
-  background: var(--ground);
-  padding-block: 16px;
+  padding-block: 14px;
 }
 
 .top-row {
@@ -217,7 +233,6 @@ code {
   background: var(--raised);
 }
 
-
 /* ----------------------------------------------------------------- buttons */
 .button {
   display: inline-flex;
@@ -255,7 +270,7 @@ code {
   font-size: 13px;
 }
 
-/* Quiet while the hero action is on screen, lit once it has scrolled away. */
+/* The hero action is always on screen, so this one stays quiet. */
 .top-copy {
   background: var(--raised);
   color: var(--ink);
@@ -263,15 +278,6 @@ code {
 
 .top-copy:hover {
   background: var(--raised-hover);
-}
-
-.top.is-scrolled .top-copy {
-  background: var(--lantern);
-  color: var(--lantern-ink);
-}
-
-.top.is-scrolled .top-copy:hover {
-  background: var(--lantern-hover);
 }
 
 kbd {
@@ -329,18 +335,20 @@ kbd {
 
 /* -------------------------------------------------------------------- hero */
 .hero {
-  padding-top: clamp(24px, 3.4vw, 56px);
+  padding-top: clamp(8px, 2.4vh, 32px);
 }
 
-.hero > .wrap {
-  padding-block: 8px;
+h1 {
+  font-size: clamp(2rem, 4.4vw, 3.5rem);
+  line-height: 1.06;
+  letter-spacing: -0.032em;
 }
 
 .lead {
   max-width: 46em;
-  margin-top: 16px;
+  margin-top: 12px;
   color: var(--ink-2);
-  font-size: 1.25rem;
+  font-size: clamp(1rem, 1.5vw, 1.25rem);
   line-height: 1.5;
 }
 
@@ -348,8 +356,8 @@ kbd {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 16px 24px;
-  margin-top: 24px;
+  gap: 12px 24px;
+  margin-top: clamp(14px, 2.2vh, 24px);
 }
 
 .status {
@@ -363,39 +371,26 @@ kbd {
 
 /* ------------------------------------------------------------------- stage */
 .stage {
-  padding-top: 32px;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
+  padding-top: clamp(12px, 2.4vh, 28px);
+  padding-bottom: clamp(12px, 2.4vh, 28px);
 }
 
-.scene {
-  position: relative;
-  height: clamp(740px, 62vw, 780px);
-  isolation: isolate;
-}
-
-.art {
-  position: absolute;
-  inset: 0;
-  overflow: hidden;
-  background: #0b1226 url("art/lock.png") 50% 100% / cover no-repeat;
-  image-rendering: pixelated;
-}
-
-.art canvas {
-  display: block;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  object-position: 50% 100%;
-  image-rendering: pixelated;
+.stage > .wrap {
+  display: grid;
+  grid-template-rows: minmax(0, 1fr);
+  min-height: 0;
 }
 
 .console {
-  position: relative;
-  z-index: 1;
-  width: min(640px, calc(100% - 48px));
+  display: grid;
+  grid-template-rows: auto minmax(0, 1fr);
+  row-gap: 12px;
+  min-height: 0;
+  width: min(640px, 100%);
   margin-inline: auto;
-  padding-top: 24px;
-  scroll-margin-top: 96px;
 }
 
 .tabs {
@@ -445,8 +440,14 @@ kbd {
   outline-offset: -2px;
 }
 
+/* Grows with its content, then stops at the space left and scrolls inside. */
 .card {
-  margin-top: 12px;
+  align-self: start;
+  min-height: 0;
+  max-height: 100%;
+  display: grid;
+  grid-template-rows: minmax(0, 1fr) auto;
+  overflow: hidden;
   background: var(--surface);
   border: 1px solid var(--line-strong);
   border-radius: 8px;
@@ -455,7 +456,26 @@ kbd {
 
 /* All panels occupy one cell, so switching never moves the page. */
 .panels {
+  min-height: 0;
   display: grid;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: thin;
+  scrollbar-color: var(--raised-hover) transparent;
+}
+
+.panels::-webkit-scrollbar {
+  width: 10px;
+}
+
+.panels::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.panels::-webkit-scrollbar-thumb {
+  border: 3px solid var(--surface);
+  border-radius: 5px;
+  background: var(--raised-hover);
 }
 
 .panel {
@@ -525,304 +545,38 @@ pre {
 .card-foot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  padding: 12px 12px 12px 20px;
+  gap: 12px;
+  padding: 10px 12px 10px 20px;
   border-top: 1px solid var(--line);
 }
 
 .card-foot p {
+  margin-right: auto;
   color: var(--ink-3);
   font-size: 13px;
   line-height: 1.4;
 }
 
-/* ------------------------------------------------------------------- fleet */
-.fleet {
-  padding-top: 24px;
-}
-
-.fleet h2 {
-  font-size: 1.25rem;
-  letter-spacing: -0.01em;
-}
-
-.fleet ul {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-top: 16px;
-}
-
-.fleet button {
-  min-height: 40px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 4px;
-  background: var(--raised);
-  color: var(--ink-2);
-  font: 400 13px/1 var(--mono);
-  cursor: pointer;
-  transition: color 160ms var(--ease), background-color 160ms var(--ease), transform 120ms var(--ease);
-}
-
-.fleet button:hover {
-  color: var(--ink);
-  background: var(--raised-hover);
-}
-
-.fleet button:active {
-  transform: scale(0.97);
-}
-
-.fleet button[aria-pressed="true"] {
-  background: var(--ink);
-  color: var(--ground);
-}
-
-.reads {
-  min-height: 3.1em;
-  margin-top: 16px;
-  color: var(--ink-3);
-  font-size: 15px;
-}
-
-/* ---------------------------------------------------------------- sections */
-.approval,
-.blocked,
-.limits,
-.close {
-  padding-top: clamp(96px, 12vw, 176px);
-}
-
-.split {
-  display: grid;
-  grid-template-columns: minmax(0, 5fr) minmax(0, 7fr);
-  gap: 48px;
-  align-items: start;
-}
-
-.say p {
-  max-width: 28em;
-  margin-top: 16px;
-  color: var(--ink-2);
-}
-
-.term {
-  min-width: 0;
-}
-
-.term .tabs {
-  margin-inline: 0;
-}
-
-.term .panels {
-  margin-top: 12px;
-  background: var(--surface);
-  border-radius: 8px;
-}
-
-.term pre {
-  white-space: pre-wrap;
-  overflow-wrap: break-word;
-  color: var(--ink-2);
-}
-
-.term b {
-  color: var(--ink);
-  font-weight: 550;
-}
-
-/* Drawn in CSS so the frame stays square in every font and at every width. */
-.term .box {
-  display: block;
-  max-width: 28rem;
-  padding: 8px 12px;
-  border: 1px solid var(--stop);
-  border-radius: 6px;
-  color: var(--ink);
-  font-weight: 550;
-}
-
-.term .divider {
-  display: block;
-  max-width: 28rem;
-  margin-block: 8px;
-  border-top: 1px solid var(--line-strong);
-}
-
-.term .yes {
-  color: var(--ok);
-}
-
-.term .wait {
-  color: var(--lantern);
-}
-
-.intro {
-  max-width: 40em;
-  margin-top: 16px;
-  color: var(--ink-2);
-}
-
-.table-wrap {
-  margin-top: 40px;
-}
-
-table {
-  width: 100%;
-  border-collapse: collapse;
-  text-align: left;
-}
-
-thead th {
-  padding: 0 24px 12px 0;
-  color: var(--ink-3);
-  font-size: 13px;
-  font-weight: 400;
-  border-bottom: 1px solid var(--line-strong);
-}
-
-tbody th,
-td {
-  padding: 16px 24px 16px 0;
-  border-bottom: 1px solid var(--line);
-  vertical-align: baseline;
-}
-
-tbody th {
-  font-size: 17px;
-  font-weight: 400;
-}
-
-td {
-  font: 400 13px/1.55 var(--mono);
-  color: var(--ink-2);
-}
-
-td:last-child {
-  padding-right: 0;
-  color: var(--ink-3);
-  white-space: nowrap;
-  text-align: right;
-}
-
-thead th:last-child {
-  padding-right: 0;
-  text-align: right;
-}
-
-tbody tr {
-  transition: background-color 160ms var(--ease);
-}
-
-tbody tr:hover {
-  background: var(--surface);
-}
-
-.after {
-  margin-top: 16px;
-  color: var(--ink-3);
-  font-size: 15px;
-}
-
-.limits dl > div {
-  padding-block: 20px;
-  border-top: 1px solid var(--line);
-}
-
-.limits dl > div:first-child {
-  padding-top: 0;
-  border-top: 0;
-}
-
-.limits dt {
-  font-size: 1.25rem;
-  font-weight: 550;
-}
-
-.limits dd {
-  max-width: 36em;
-  margin-top: 8px;
-  color: var(--ink-2);
-}
-
-.close {
-  text-align: center;
-}
-
-.close .lead {
-  margin-inline: auto;
-}
-
-.close .actions {
-  flex-direction: column;
-}
-
-.close .button {
-  padding-right: 20px;
-}
-
-/* ------------------------------------------------------------------ footer */
-.foot {
-  margin-top: clamp(96px, 12vw, 176px);
-  border-top: 1px solid var(--line);
-}
-
-.foot-row {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 8px 32px;
-  padding-block: 24px;
-  color: var(--ink-3);
-  font-size: 13px;
-}
-
-.foot ul {
-  display: flex;
-  gap: 8px;
-  margin-right: auto;
-}
-
-.foot a {
-  display: inline-flex;
-  align-items: center;
-  min-height: 40px;
-  padding-inline: 8px;
-  color: var(--ink-2);
-  text-underline-offset: 4px;
-  text-decoration-color: var(--line-strong);
-  transition: color 160ms var(--ease), text-decoration-color 160ms var(--ease);
-}
-
-.foot a:hover {
-  color: var(--ink);
-  text-decoration-color: var(--lantern);
-}
-
 .shortcut {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
-  min-height: 40px;
+  gap: 6px;
+  color: var(--ink-3);
+  font: 400 13px/1 var(--mono);
+  white-space: nowrap;
   cursor: pointer;
-}
-
-.shortcut input {
-  width: 24px;
-  height: 24px;
-  margin: 0;
-  accent-color: var(--lantern);
+  transition: color 160ms var(--ease);
 }
 
 .shortcut:hover {
   color: var(--ink);
 }
 
-.shortcut input:hover {
-  outline: 1px solid var(--ink-3);
-  outline-offset: 2px;
+.shortcut input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--lantern);
 }
 
 html:not(.js) .shortcut,
@@ -831,75 +585,69 @@ html:not(.js) .card-foot .button {
   display: none;
 }
 
-/* ------------------------------------------------------------------ narrow */
-/* Touch screens get 44px targets. */
-@media (pointer: coarse), (max-width: 720px) {
-  .tabs button,
-  .fleet button,
-  .button-small,
-  .foot a,
-  .shortcut {
-    min-height: 44px;
-  }
-
-  .foot a {
-    min-width: 44px;
-  }
-}
-
-@media (max-width: 960px) {
-  .split {
-    grid-template-columns: minmax(0, 1fr);
-    gap: 32px;
-  }
-
-  .top nav a:not(:last-child) {
-    display: none;
-  }
-}
-
-/* Side-by-side widths: the painting takes whatever height the first screen has
-   left, so the lock shows under the card without scrolling. */
-@media (min-width: 1021px) {
-  .scene {
-    height: clamp(540px, calc(100svh - 384px), 780px);
-  }
-
-  .console {
-    padding-top: 12px;
-  }
-
-  .card {
-    margin-top: 8px;
-  }
-}
-
-/* Laptop-height screens: draw the same page closer together. */
-@media (min-width: 1021px) and (max-height: 960px) {
-  .scene {
-    height: clamp(612px, calc(100svh - 272px), 780px);
-  }
-
+/* --------------------------------------------------------------- short screens */
+/* Laptop height: draw the same page closer together. */
+@media (max-height: 820px) {
   .top {
-    padding-block: 8px;
-  }
-
-  .hero {
-    padding-top: 0;
+    padding-block: 10px;
   }
 
   h1 {
-    font-size: 3rem;
+    font-size: clamp(1.75rem, 3.6vw, 2.75rem);
   }
 
   .lead {
-    max-width: 72em;
-    margin-top: 4px;
-    font-size: 17px;
+    margin-top: 8px;
+    font-size: 1rem;
   }
 
   .actions {
-    margin-top: 12px;
+    margin-top: 14px;
+  }
+
+  .actions .button {
+    min-height: 46px;
+  }
+
+  .stage {
+    padding-top: 12px;
+    padding-bottom: 16px;
+  }
+
+  .panel {
+    padding: 14px 20px 10px;
+  }
+
+  .console pre {
+    line-height: 1.45;
+  }
+
+  .changes li {
+    padding-bottom: 4px;
+    line-height: 1.4;
+  }
+
+  .card-foot {
+    padding-block: 8px;
+  }
+}
+
+/* Landscape phones and small windows: the headline carries the page. */
+@media (max-height: 620px) {
+  .top {
+    padding-block: 6px;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 3vw, 2rem);
+  }
+
+  .lead {
+    display: none;
+  }
+
+  .actions {
+    margin-top: 10px;
   }
 
   .actions .button {
@@ -907,62 +655,37 @@ html:not(.js) .card-foot .button {
   }
 
   .stage {
-    padding-top: 12px;
+    padding-top: 10px;
+    padding-bottom: 10px;
   }
 
-  /* Narrow enough to leave the keeper's window clear. */
-  .console {
-    width: 580px;
-  }
-
-  .console .panel {
-    padding: 12px 20px 8px;
-  }
-
-  .console pre {
-    line-height: 1.4;
-  }
-
-  .changes li {
-    padding-bottom: 2px;
-    line-height: 1.35;
+  .panel {
+    padding: 12px 16px 8px;
   }
 
   .card-foot {
-    padding-block: 8px;
+    padding-block: 6px;
   }
 }
 
-/* Below this width the card would sit on the lock, so it moves under the painting. */
-@media (max-width: 1020px) {
-  .scene {
-    height: auto;
+@media (max-height: 460px) {
+  .status {
+    display: none;
   }
 
-  .art {
-    position: relative;
-    height: clamp(240px, 52vw, 460px);
-    background-position: 55% 100%;
-  }
-
-  .art canvas {
-    object-position: 55% 100%;
-  }
-
-  .console {
-    width: min(640px, 100%);
-    padding-top: 12px;
+  .top nav a:not(:last-child) {
+    display: none;
   }
 }
 
+/* ------------------------------------------------------------------ narrow */
 @media (max-width: 720px) {
   :root {
     --pad: 16px;
   }
 
-  .framed > .wrap::before,
-  .framed > .wrap::after {
-    display: none;
+  body {
+    font-size: 16px;
   }
 
   .top-row {
@@ -970,12 +693,11 @@ html:not(.js) .card-foot .button {
   }
 
   .mark {
-    font-size: 1.25rem;
     gap: 8px;
   }
 
-  /* On a phone the header holds one thing beside the name at a time. */
-  .top.is-scrolled nav {
+  /* The hero button is on screen, so the header keeps one link. */
+  .top nav a:not(:last-child) {
     display: none;
   }
 
@@ -983,69 +705,43 @@ html:not(.js) .card-foot .button {
     display: none;
   }
 
-  .top.is-scrolled .top-copy {
-    display: inline-flex;
-    margin-left: auto;
-  }
-
   .actions {
     align-items: stretch;
     flex-direction: column;
+    gap: 8px;
+    margin-top: 12px;
+  }
+
+  h1 {
+    font-size: clamp(1.5rem, 6.4vw, 2rem);
+  }
+
+  .lead {
+    margin-top: 8px;
+    font-size: 15px;
+    line-height: 1.45;
+  }
+
+  .status {
+    font-size: 13px;
+    line-height: 1.4;
+    text-align: center;
   }
 
   .tabs button {
     padding-inline: 10px;
-    font-size: 13px;
   }
 
   .panel {
     padding: 16px 16px 12px;
   }
 
-  .term pre {
-    font-size: 13px;
-  }
-
   .card-foot {
     padding-left: 16px;
   }
 
-  /* Each table row becomes a small block that reads top to bottom. */
-  table,
-  tbody,
-  tbody tr,
-  tbody th,
-  td {
-    display: block;
-  }
-
-  thead {
-    position: absolute;
-    width: 1px;
-    height: 1px;
-    overflow: hidden;
-    clip-path: inset(50%);
-  }
-
-  tbody tr {
-    padding-block: 16px;
-    border-bottom: 1px solid var(--line);
-  }
-
-  tbody th,
-  td {
-    padding: 0;
-    border: 0;
-  }
-
-  td {
-    margin-top: 8px;
-  }
-
-  td:last-child {
-    margin-top: 4px;
-    text-align: left;
-    font-size: 13px;
+  .card-foot p {
+    display: none;
   }
 }
 
@@ -1056,11 +752,21 @@ html:not(.js) .card-foot .button {
   }
 }
 
-@media (prefers-reduced-motion: reduce) {
-  html {
-    scroll-behavior: auto;
+/* Touch screens get 44px targets. */
+@media (pointer: coarse) {
+  .tabs button,
+  .button-small,
+  .shortcut {
+    min-height: 44px;
   }
 
+  .shortcut input {
+    width: 20px;
+    height: 20px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
   *,
   *::before,
   *::after {
@@ -1072,13 +778,11 @@ html:not(.js) .card-foot .button {
 
 @media (forced-colors: active) {
   .button,
-  .tabs button,
-  .fleet button {
+  .tabs button {
     border: 1px solid ButtonText;
   }
 
-  .tabs button[aria-selected="true"],
-  .fleet button[aria-pressed="true"] {
+  .tabs button[aria-selected="true"] {
     outline: 2px solid Highlight;
     outline-offset: -4px;
   }
